@@ -15,8 +15,10 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('Database connected'))
   .catch((err) => console.log(err));
 
-// Use auth routes
+// Routes to use
 app.use('/api/users', authRoutes);
+app.use('/api/products', productRoutes);
+
 
 // Start server
 const PORT = process.env.PORT || 3000;
