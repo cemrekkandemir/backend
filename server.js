@@ -20,6 +20,11 @@ mongoose.connect(process.env.MONGO_URI)
 app.use('/api/users', authRoutes);
 app.use('/api/products', productRoutes);
 
+//cartRoutes
+const cartRoutes = require('./Routes/cartRoutes'); 
+app.use('/api/cart', cartRoutes);
+
+
 
 // Start server
 const PORT = process.env.PORT || 3000;
