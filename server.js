@@ -1,30 +1,50 @@
+// server.js
+
 const express = require('express');
 const mongoose = require('mongoose');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const cors = require('cors');
-const authRoutes = require('./Routes/authRoutes'); 
+const authRoutes = require('./Routes/authRoutes');
 const productRoutes = require('./Routes/productRoutes');
+const cartRoutes = require('./Routes/cartRoutes');
 require('dotenv').config();
 
 const app = express();
+
 app.use(express.json());
 
-// Enable CORS
-app.use(cors());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your_session_secret_key',
+  resave: false,
+  saveUninitialized: true, 
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions',
+  }),
+  cookie: {
+    secure: false, 
+    httpOnly: false, 
+    maxAge: 1000 * 60 * 60 * 24, 
+    sameSite: 'lax', 
+  },
+}));
+
+
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true,
+}));
 
 // Database connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('Database connected'))
   .catch((err) => console.log(err));
 
-// Routes to use
+// Routes
 app.use('/api/users', authRoutes);
 app.use('/api/products', productRoutes);
-
-//cartRoutes
-const cartRoutes = require('./Routes/cartRoutes'); 
 app.use('/api/cart', cartRoutes);
-
-
 
 // Start server
 const PORT = process.env.PORT || 3000;
