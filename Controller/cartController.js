@@ -2,63 +2,47 @@ const Cart = require('../Models/Cart');
 const Product = require('../Models/Product');
 const mongoose = require('mongoose');
 
-// Add Product to Cart
+// Helper function: Find or create a cart
+const findOrCreateCart = async (userId, guestId) => {
+  let cart;
+
+  if (userId) {
+    cart = await Cart.findOne({ userId });
+    if (!cart) {
+      cart = new Cart({ userId, items: [] });
+      await cart.save();
+    }
+  } else if (guestId) {
+    cart = await Cart.findOne({ guestId });
+    if (!cart) {
+      cart = new Cart({ guestId, items: [] });
+      await cart.save();
+    }
+  }
+
+  return cart;
+};
+
+// **1. Ürün ekleme**
 exports.addItem = async (req, res) => {
+  console.log('req.user in addItem:', req.user);
   try {
     const { productId, quantity } = req.body;
+    const userId = req.user?._id || null; // Giriş yapan kullanıcı
+    const guestId = req.sessionID; // Misafir kullanıcı
 
-    // Get userId if the user is logged in
-    const userId = req.user ? req.user._id : null;
-
-    // Get sessionId for guest users
-    const sessionId = req.sessionID;
-
-    // Data validation
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({ error: 'Quantity must be greater than zero' });
-    }
-
-    // Product stock control
+    const cart = await findOrCreateCart(userId, guestId);
     const product = await Product.findById(productId);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    // Find or create the cart specific to the user or guest
-    let cart;
-    if (userId) {
-      // User is logged in, find cart by userId
-      cart = await Cart.findOne({ userId });
-      if (!cart) {
-        cart = new Cart({ userId, items: [] });
-      }
+    if (!product || product.stock < quantity) {
+      return res.status(400).json({ error: 'Insufficient stock or product not found' });
+    }
+
+    // Sepette ürün varsa miktarı artır
+    const existingItem = cart.items.find(item => item.productId.equals(productId));
+    if (existingItem) {
+      existingItem.quantity += quantity;
     } else {
-      // Guest user, find cart by sessionId
-      cart = await Cart.findOne({ sessionId });
-      if (!cart) {
-        cart = new Cart({ sessionId, items: [] });
-      }
-    }
-
-    // Calculate the total quantity for the product
-    const existingItemIndex = cart.items.findIndex(item => item.productId.equals(productId));
-    let totalQuantity = quantity;
-    if (existingItemIndex > -1) {
-      totalQuantity += cart.items[existingItemIndex].quantity;
-    }
-
-    // Check if the total quantity exceeds the product stock
-    if (product.stock < totalQuantity) {
-      return res.status(400).json({ error: 'Insufficient stock for the total quantity' });
-    }
-
-    // Check if the product already exists in the cart
-    if (existingItemIndex > -1) {
-      // Increase the quantity of the existing product
-      cart.items[existingItemIndex].quantity = totalQuantity;
-    } else {
-      // Add new product to the cart
       cart.items.push({ productId, quantity });
     }
 
@@ -70,110 +54,98 @@ exports.addItem = async (req, res) => {
   }
 };
 
-// Update the Product in the Cart
+// **2. Ürün güncelleme**
+// **2. Ürün güncelleme**
 exports.updateItem = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
+    const userId = req.user?._id || null; // Giriş yapan kullanıcı
+    const guestId = req.sessionID; // Misafir kullanıcı
 
-    const userId = req.user ? req.user._id : null;
-    const sessionId = req.sessionID;
+    console.log("=== Incoming Update Request ===");
+    console.log("Incoming productId:", productId);
+    console.log("Incoming quantity:", quantity);
+    console.log("Session ID (guestId):", guestId);
+    console.log("User ID:", userId);
 
-    // Data validation
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({ error: 'Quantity must be greater than zero' });
-    }
+    // Sepeti bulun veya oluşturun
+    const cart = await findOrCreateCart(userId, guestId);
 
-    // Product stock control
-    const product = await Product.findById(productId);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
-    if (product.stock < quantity) {
-      return res.status(400).json({ error: 'Insufficient stock' });
-    }
+    console.log("Cart found:", cart);
+    console.log("Cart items before update:", cart.items);
 
-    // Find the cart
-    let cart;
-    if (userId) {
-      cart = await Cart.findOne({ userId });
-    } else {
-      cart = await Cart.findOne({ sessionId });
-    }
-    if (!cart) return res.status(404).json({ error: 'Cart not found' });
+    // Sepette ürünü bulun
+    const itemIndex = cart.items.findIndex(item =>
+      item.productId.toHexString() === productId
+    );
 
-    // Check if the product exists in the cart
-    const itemIndex = cart.items.findIndex(item => item.productId.equals(productId));
+    console.log("Item index in cart:", itemIndex);
+
     if (itemIndex > -1) {
-      // Update the quantity of the product
-      cart.items[itemIndex].quantity = quantity;
+      // Eğer miktar 0 ise ürünü kaldır
+      if (quantity === 0) {
+        console.log("Removing item from cart:", productId);
+        cart.items.splice(itemIndex, 1);
+      } else {
+        // Stoğu kontrol et
+        const product = await Product.findById(productId);
+        if (!product || product.stock < quantity) {
+          console.log("Insufficient stock or product not found for:", product);
+          return res.status(400).json({ error: 'Insufficient stock or product not found' });
+        }
+
+        // Ürünün miktarını güncelle
+        cart.items[itemIndex].quantity = quantity;
+        console.log("Updated item quantity:", cart.items[itemIndex]);
+      }
+
+      // Sepeti kaydet
       await cart.save();
+      console.log("Cart updated successfully:", cart);
       res.status(200).json(cart);
     } else {
-      res.status(404).json({ error: 'Product not found in cart' });
+      console.log("Product not found in cart:", productId);
+      res.status(404).json({ error: 'Product not found in the cart' });
     }
   } catch (error) {
-    console.error('Error updating item in cart:', error);
-    res.status(500).json({ error: 'Error updating item in cart' });
+    console.error('Error updating product in the cart:', error);
+    res.status(500).json({ error: 'Error updating product in the cart' });
   }
 };
 
-// Remove Products from Cart
+
+// **3. Ürün çıkarma**
 exports.removeItem = async (req, res) => {
   try {
     const { productId } = req.body;
+    const userId = req.user?._id || null;
+    const guestId = req.sessionID;
 
-    const userId = req.user ? req.user._id : null;
-    const sessionId = req.sessionID;
+    const cart = await findOrCreateCart(userId, guestId);
+    const initialLength = cart.items.length;
 
-    // Data validation
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
-
-    // Find the cart
-    let cart;
-    if (userId) {
-      cart = await Cart.findOne({ userId });
-    } else {
-      cart = await Cart.findOne({ sessionId });
-    }
-    if (!cart) return res.status(404).json({ error: 'Cart not found' });
-
-    // Remove the product from the cart
-    const initialItemsLength = cart.items.length;
     cart.items = cart.items.filter(item => !item.productId.equals(productId));
 
-    if (cart.items.length < initialItemsLength) {
+    if (cart.items.length < initialLength) {
       await cart.save();
       res.status(200).json(cart);
     } else {
-      res.status(404).json({ error: 'Product not found in cart' });
+      res.status(404).json({ error: 'Product not found in the cart' });
     }
   } catch (error) {
-    console.error('Error removing item from cart:', error);
-    res.status(500).json({ error: 'Error removing item from cart' });
+    console.error('Error removing product from the cart:', error);
+    res.status(500).json({ error: 'Error removing product from the cart' });
   }
 };
 
-// Get Cart for the Logged-In User or Guest User
+// **4. Sepeti görüntüleme**
 exports.viewCart = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : null;
-    const sessionId = req.sessionID;
+    const userId = req.user?._id || null;
+    const guestId = req.sessionID;
 
-    // Find the cart based on userId or sessionId
-    let cart;
-    if (userId) {
-      cart = await Cart.findOne({ userId }).populate('items.productId', 'name price');
-    } else {
-      cart = await Cart.findOne({ sessionId }).populate('items.productId', 'name price');
-    }
-
-    if (!cart) {
-      return res.status(404).json({ error: 'Cart not found' });
-    }
-
+    const cart = await findOrCreateCart(userId, guestId);
+    await cart.populate('items.productId', 'name price stock'); // Ürün bilgilerini doldur
     res.status(200).json(cart);
   } catch (error) {
     console.error('Error viewing cart:', error);
