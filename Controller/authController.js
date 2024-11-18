@@ -71,7 +71,7 @@ exports.login = async (req, res) => {
       httpOnly: true,
       sameSite: 'None', 
       secure: true,
-      maxAge: 24 * 60 * 60 * 1000 // 1 day
+      maxAge: 24 * 60 * 60 * 1000 
     });
 
     res.status(200).json({
@@ -119,7 +119,7 @@ exports.logout = async (req, res) => {
   const cookies = req.cookies;
 
   if (!cookies?.jwt) {
-    return res.status(200).json({ message: 'Successfully logged out' }); // Return 200 with a success message
+    return res.status(200).json({ message: 'Successfully logged out' }); 
   }
 
   const refreshToken = cookies.jwt;
@@ -134,7 +134,7 @@ exports.logout = async (req, res) => {
         sameSite: 'None',
         secure: true,
       });
-      return res.status(200).json({ message: 'Successfully logged out' }); // Return 200 with a success message
+      return res.status(200).json({ message: 'Successfully logged out' }); 
     }
 
     // Clear the refresh token from the database
@@ -148,7 +148,7 @@ exports.logout = async (req, res) => {
       secure: true,
     });
 
-    // Send 200 response with the logout message
+   
     res.status(200).json({ message: 'Successfully logged out' });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
