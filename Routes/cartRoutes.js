@@ -5,11 +5,12 @@ const cartController = require('../Controller/cartController');
 const optionalAuth = require('../Middleware/optionalAuth');
 
 
-router.post('/add', optionalAuth, cartController.addItem);
-router.put('/update', optionalAuth, cartController.updateItem);
-router.delete('/remove', optionalAuth, cartController.removeItem);
+router.use(optionalAuth);
 
 
-router.get('/view', optionalAuth, cartController.viewCart);
+router.post('/add', cartController.addItem);
+router.put('/update', cartController.updateItem);
+router.delete('/remove', cartController.removeItem);
+router.get('/view', cartController.viewCart);
 
 module.exports = router;
