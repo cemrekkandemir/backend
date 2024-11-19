@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const authRoutes = require('./Routes/authRoutes'); 
 const productRoutes = require('./Routes/productRoutes');
+const paymentRoute= require('./Routes/paymentRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -19,6 +20,8 @@ mongoose.connect(process.env.MONGO_URI)
 // Routes to use
 app.use('/api/users', authRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/payment', paymentRoute);
+
 
 //cartRoutes
 const cartRoutes = require('./Routes/cartRoutes'); 

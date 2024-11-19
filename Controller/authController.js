@@ -2,7 +2,21 @@ const User = require('../Models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    { email: user.email, id: user._id, role: user.role },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: '15m' } 
+  );
+};
 
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { email: user.email, id: user._id },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: '1d' } 
+  );
+};
 
 exports.signup = async (req, res) => {
   try {
