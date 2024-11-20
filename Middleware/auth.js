@@ -1,33 +1,36 @@
-// middleware/authMiddleware.js
-
 const jwt = require('jsonwebtoken');
 const User = require('../Models/User');
 
-const requireAuth = (req, res, next) => {
+const requireAuth = async (req, res, next) => {
   const { authorization } = req.headers;
 
+  console.log("Authorization header:", authorization);
+
   if (!authorization) {
+    console.log("No authorization header found");
     return res.status(401).json({ error: 'Authorization token required' });
   }
 
   const token = authorization.split(' ')[1];
+  console.log("Token:", token);
 
-  jwt.verify(token, 'your_jwt_secret_key', async (err, decodedToken) => {
-    if (err) {
-      return res.status(401).json({ error: 'Request not authorized' });
+  try {
+    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    console.log("Decoded token:", decodedToken);
+
+    const user = await User.findById(decodedToken.id);
+    if (!user) {
+      console.log("User not found");
+      return res.status(404).json({ error: 'User not found' });
     }
-    
-    try {
-      const user = await User.findById(decodedToken.id);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      req.user = user;
-      next();
-    } catch (error) {
-      res.status(401).json({ error: 'Request not authorized' });
-    }
-  });
+
+    console.log("User found and attached to req.user:", user);
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("Token verification failed:", error.message);
+    return res.status(401).json({ error: 'Request not authorized' });
+  }
 };
 
 module.exports = requireAuth;

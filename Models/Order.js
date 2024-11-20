@@ -9,13 +9,13 @@ const orderSchema = new mongoose.Schema({
     enum: ['processing', 'in-transit', 'delivered'],
     default: 'processing'
   },
-  address: { type: mongoose.Schema.Types.ObjectId, ref: 'User.address', required: true }, // Users' address
+  address: { type: String, required: true }, 
   statusUpdatedAt: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now },
   returnableUntil: {
     type: Date,
     default: function () {
-      return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days after now
+      return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 day after 
     }
   }
 });
