@@ -6,7 +6,7 @@ exports.placeOrder = async (req, res) => {
   try {
     console.log("User making the request:", req.user);
 
-    // Kullanıcı sepetini bul
+    // Find user cart
     const cart = await Cart.findOne({ userId: req.user._id }).populate('items.productId');
     console.log("Cart found:", cart);
 
@@ -15,7 +15,7 @@ exports.placeOrder = async (req, res) => {
       return res.status(400).json({ error: 'Your cart is empty' });
     }
 
-    // Sipariş oluşturma işlemleri
+    // Order creation operations
     let totalAmount = 0;
 
     for (const item of cart.items) {
@@ -29,7 +29,7 @@ exports.placeOrder = async (req, res) => {
         });
       }
 
-      // Stok güncelleme
+      // Stock update
       product.stock -= item.quantity;
       await product.save();
       totalAmount += product.price * item.quantity;

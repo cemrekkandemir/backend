@@ -2,7 +2,21 @@ const User = require('../Models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    { email: user.email, id: user._id, role: user.role },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: '15m' } 
+  );
+};
 
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { email: user.email, id: user._id },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: '1d' } 
+  );
+};
 
 exports.signup = async (req, res) => {
   try {
@@ -52,7 +66,7 @@ exports.login = async (req, res) => {
     const accessToken = jwt.sign(
       { email: user.email, id: user._id, role: user.role },
       process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '30s' }
+      { expiresIn: '1d' }
     );
 
     // Generate a long-lived refresh token for the user
@@ -71,7 +85,7 @@ exports.login = async (req, res) => {
       httpOnly: true,
       sameSite: 'None', 
       secure: true,
-      maxAge: 24 * 60 * 60 * 1000 
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
     });
 
     res.status(200).json({
@@ -119,7 +133,7 @@ exports.logout = async (req, res) => {
   const cookies = req.cookies;
 
   if (!cookies?.jwt) {
-    return res.status(200).json({ message: 'Successfully logged out' }); 
+    return res.status(200).json({ message: 'Successfully logged out' }); // Return 200 with a success message
   }
 
   const refreshToken = cookies.jwt;
@@ -134,7 +148,7 @@ exports.logout = async (req, res) => {
         sameSite: 'None',
         secure: true,
       });
-      return res.status(200).json({ message: 'Successfully logged out' }); 
+      return res.status(200).json({ message: 'Successfully logged out' }); // Return 200 with a success message
     }
 
     // Clear the refresh token from the database
@@ -148,7 +162,7 @@ exports.logout = async (req, res) => {
       secure: true,
     });
 
-   
+    // Send 200 response with the logout message
     res.status(200).json({ message: 'Successfully logged out' });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
