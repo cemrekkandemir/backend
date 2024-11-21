@@ -33,8 +33,8 @@ app.use(session({
 
 
 app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true,
+  origin: 'http://localhost:5173', // Allow requests from the frontend
+  credentials: true, // Allow cookies and authorization headers
 }));
 
 // Database connection
@@ -49,7 +49,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
