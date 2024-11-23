@@ -80,3 +80,40 @@ exports.updateOrderStatus = async (req, res) => {
     res.status(500).json({ error: 'Failed to update order status' });
   }
 };
+
+
+const addFeedback = async (req, res) => {
+  const { productId } = req.params;
+  const { text, rating } = req.body;
+
+  if (rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+  }
+
+  try {
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const feedback = {
+      user: req.user._id, // User ID from authentication middleware
+      text: text || null, // Optional comment
+      rating,
+      isVisible: text ? false : undefined, // Visibility applies only to comments
+    };
+
+    product.feedback.push(feedback);
+
+    // Update average rating
+    const totalRatings = product.feedback.reduce((sum, f) => sum + f.rating, rating);
+    const totalCount = product.feedback.length + 1;
+    product.averageRating = totalRatings / totalCount;
+
+    await product.save();
+
+    res.status(201).json({ message: 'Feedback added. Comment awaiting approval if provided.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to add feedback' });
+  }
+};
