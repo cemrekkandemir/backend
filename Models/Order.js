@@ -15,7 +15,7 @@ const orderSchema = new mongoose.Schema({
   returnableUntil: {
     type: Date,
     default: function () {
-      return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 day after 
+      return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days after 
     }
   }
 });
