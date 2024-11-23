@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const feedbackSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  text: { type: String }, // Optional comment
+  text: { type: String },
   rating: { type: Number, required: true, min: 1, max: 5 }, // Rating is required
   isVisible: { type: Boolean, default: false }, // Visibility flag for comments only
   createdAt: { type: Date, default: Date.now },
