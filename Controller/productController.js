@@ -104,8 +104,8 @@ exports.updateCommentVisibility = async (req, res) => {
     }
   };
   
-  // Get feedback for a product
-  exports.getFeedback = async (req, res) => {
+// Get feedback for a product (GET)
+exports.getFeedback = async (req, res) => {
     const { productId } = req.params;
   
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -130,4 +130,39 @@ exports.updateCommentVisibility = async (req, res) => {
       res.status(500).json({ error: 'Failed to get feedback.' });
     }
   };
-  
+
+// Post a comment for a product (POST)
+exports.postComment = async (req, res) => {
+    const { productId } = req.params;
+    const { userId, text, rating } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid product or user ID' });
+    }
+
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'Rating must be a number between 1 and 5' });
+    }
+
+    try {
+        const product = await Product.findById(productId);
+        if (!product) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+
+        const feedback = {
+            user: userId,
+            text,
+            rating,
+            isVisible: false, // Initially set to false, admin needs to approve
+            createdAt: Date.now()
+        };
+
+        product.feedback.push(feedback);
+        await product.save();
+
+        res.status(201).json({ message: 'Comment added successfully.', feedback });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to post comment.' });
+    }
+};
