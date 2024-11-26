@@ -1,6 +1,6 @@
-// Update for better validation and error handling
 const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
 require('dotenv').config(); // Load environment variables
 
 exports.mockPayment = (req, res) => {
@@ -10,7 +10,7 @@ exports.mockPayment = (req, res) => {
         return res.status(400).json({ message: 'Invalid payment details' });
     }
 
-    // Simple credit card validation using Luhn's Algorithm
+    // Validate credit card using Luhn's Algorithm
     const isValidCard = cardNumber.split('').reverse().reduce((sum, digit, idx) => {
         digit = parseInt(digit);
         if (idx % 2) digit *= 2;
@@ -49,6 +49,7 @@ exports.generateInvoice = async (req, res) => {
         const transporter = nodemailer.createTransport({
             host: process.env.EMAIL_HOST,
             port: process.env.EMAIL_PORT,
+            secure: process.env.EMAIL_PORT == 465, // True if port is 465
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS,
@@ -71,13 +72,15 @@ exports.generateInvoice = async (req, res) => {
 
             res.json({ message: 'Invoice sent successfully' });
         } catch (error) {
+            console.error('Error sending email:', error);
             res.status(500).json({ message: 'Error sending email', error });
         }
     });
 
-    doc.text(`Invoice for Order ID: ${orderDetails.id}`);
+    // Generate PDF content
+    doc.fontSize(16).text(`Invoice for Order ID: ${orderDetails.id}`, { underline: true });
     doc.text(`Transaction ID: ${transactionId}`);
     doc.text(`User: ${user.name}`);
-    doc.text(`Total Amount: ${orderDetails.amount}`);
+    doc.text(`Total Amount: ${orderDetails.amount} USD`);
     doc.end();
 };
