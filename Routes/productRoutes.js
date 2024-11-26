@@ -9,6 +9,14 @@ router.get('/:id', productController.getProductById);
 // Create a new product
 router.post('/', productController.createProduct);
 
+// Update a product by ID
+router.put('/:id', productController.updateProduct);
+
+// Delete a product by ID
+router.delete('/:id', productController.deleteProduct);
+
+router.post('/create-multiple', productController.createProducts);
+
 // Route to update comment visibility
 router.put('/:productId/feedback/:feedbackId/visibility', productController.updateCommentVisibility);
 
