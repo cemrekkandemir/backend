@@ -23,6 +23,9 @@ router.put('/:productId/feedback/:feedbackId/visibility', productController.upda
 // Route to get feedback for a product
 router.get('/:productId/feedback', productController.getFeedback);
 
+// Route to post a comment for a product
+router.post('/:productId/feedback', productController.postComment);
+
 
 module.exports = router;
 

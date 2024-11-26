@@ -1,5 +1,5 @@
+const mongoose = require('mongoose');
 const Product = require('../Models/Product');
-
 
 // Get a product's details by ID (GET)
 exports.getProductById = async (req, res) => {
@@ -8,29 +8,26 @@ exports.getProductById = async (req, res) => {
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
-        res.status(200).json(product); // Send the product in the response
+        res.status(200).json(product);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-
 // Create multiple products (POST)
 exports.createProducts = async (req, res) => {
-    const products = req.body; // Expecting an array of product objects
+    const products = req.body;
     try {
-        // Validate if the body is an array
         if (!Array.isArray(products)) {
             return res.status(400).json({ message: 'Input should be an array of products.' });
         }
-
-        // Use insertMany for batch creation
         const savedProducts = await Product.insertMany(products);
         res.status(201).json({ message: 'Products created successfully.', data: savedProducts });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
+
 // Create a new product (POST)
 exports.createProduct = async (req, res) => {
     const { name, description, price, category, brand, stock, imageURL } = req.body;
@@ -42,6 +39,8 @@ exports.createProduct = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// Update a product by ID (PUT)
 exports.updateProduct = async (req, res) => {
     try {
         const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -62,105 +61,89 @@ exports.deleteProduct = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
 // Get all products (GET)
 exports.getAllProducts = async (req, res) => {
     try {
         const products = await Product.find();
-        res.status(200).json(products); // Send the list of products
+        res.status(200).json(products);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-// Update comment visibility
+// Update comment visibility (PUT)
 exports.updateCommentVisibility = async (req, res) => {
     const { productId, feedbackId } = req.params;
-  
     if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(feedbackId)) {
-      return res.status(400).json({ error: 'Invalid product or feedback ID' });
+        return res.status(400).json({ error: 'Invalid product or feedback ID' });
     }
-  
-    try {
-      const product = await Product.findById(productId);
-      if (!product) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-  
-      const feedback = product.feedback.id(feedbackId);
-      if (!feedback) {
-        return res.status(404).json({ error: 'Feedback not found' });
-      }
-  
-      if (!feedback.text) {
-        return res.status(400).json({ error: 'This feedback does not include a comment.' });
-      }
-  
-      feedback.isVisible = true;
-      await product.save();
-  
-      res.status(200).json({ message: 'Comment visibility updated.', feedback });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to update comment visibility.' });
-    }
-  };
-  
-// Get feedback for a product (GET)
-exports.getFeedback = async (req, res) => {
-    const { productId } = req.params;
-  
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
-  
-    try {
-      const product = await Product.findById(productId).populate('feedback.user', 'name');
-      if (!product) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-  
-      const visibleComments = product.feedback.filter(f => f.text && f.isVisible);
-      const ratingsOnly = product.feedback.filter(f => !f.text);
-  
-      res.status(200).json({
-        averageRating: product.averageRating,
-        visibleComments,
-        ratingsOnly,
-      });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get feedback.' });
-    }
-  };
-
-// Post a comment for a product (POST)
-exports.postComment = async (req, res) => {
-    const { productId } = req.params;
-    const { userId, text, rating } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ error: 'Invalid product or user ID' });
-    }
-
-    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-        return res.status(400).json({ error: 'Rating must be a number between 1 and 5' });
-    }
-
     try {
         const product = await Product.findById(productId);
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
+        const feedback = product.feedback.id(feedbackId);
+        if (!feedback) {
+            return res.status(404).json({ error: 'Feedback not found' });
+        }
+        if (!feedback.text) {
+            return res.status(400).json({ error: 'This feedback does not include a comment.' });
+        }
+        feedback.isVisible = true;
+        await product.save();
+        res.status(200).json({ message: 'Comment visibility updated.', feedback });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update comment visibility.' });
+    }
+};
 
+// Get feedback for a product (GET)
+exports.getFeedback = async (req, res) => {
+    const { productId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ error: 'Invalid product ID' });
+    }
+    try {
+        const product = await Product.findById(productId).populate('feedback.user', 'name');
+        if (!product) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        const visibleComments = product.feedback.filter(f => f.text && f.isVisible);
+        const ratingsOnly = product.feedback.filter(f => !f.text);
+        res.status(200).json({
+            averageRating: product.averageRating,
+            visibleComments,
+            ratingsOnly,
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get feedback.' });
+    }
+};
+
+// Post a comment for a product (POST)
+exports.postComment = async (req, res) => {
+    const { productId } = req.params;
+    const { userId, text, rating } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid product or user ID' });
+    }
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'Rating must be a number between 1 and 5' });
+    }
+    try {
+        const product = await Product.findById(productId);
+        if (!product) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
         const feedback = {
             user: userId,
             text,
             rating,
-            isVisible: false, // Initially set to false, admin needs to approve
-            createdAt: Date.now()
+            isVisible: false
         };
-
         product.feedback.push(feedback);
         await product.save();
-
         res.status(201).json({ message: 'Comment added successfully.', feedback });
     } catch (error) {
         res.status(500).json({ error: 'Failed to post comment.' });
