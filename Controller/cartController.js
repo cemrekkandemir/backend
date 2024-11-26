@@ -2,61 +2,45 @@ const Cart = require('../Models/Cart');
 const Product = require('../Models/Product');
 const mongoose = require('mongoose');
 
-// Add Product to Cart
+// Helper function: Find or create a cart
+const findOrCreateCart = async (userId, guestId) => {
+  let cart;
+
+  if (userId) {
+    cart = await Cart.findOne({ userId });
+    if (!cart) {
+      cart = new Cart({ userId, items: [] });
+      await cart.save();
+    }
+  } else if (guestId) {
+    cart = await Cart.findOne({ guestId });
+    if (!cart) {
+      cart = new Cart({ guestId, items: [] });
+      await cart.save();
+    }
+  }
+
+  return cart;
+};
+
+// addItem
 exports.addItem = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
+    const userId = req.user?._id || null; // user
+    const guestId = req.sessionID;  // Guest
 
-    // Get userId if the user is logged in
-    const userId = req.user ? req.user._id : null;
-
-    // Get sessionId for guest users
-    const sessionId = req.sessionID;
-
-    // Data validation
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({ error: 'Quantity must be greater than zero' });
-    }
-
-    // Product stock control
+    const cart = await findOrCreateCart(userId, guestId);
     const product = await Product.findById(productId);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    // Find or create the cart specific to the user or guest
-    let cart;
-    if (userId) {
-      // User is logged in, find cart by userId
-      cart = await Cart.findOne({ userId });
-      if (!cart) {
-        cart = new Cart({ userId, items: [] });
-      }
-    } else {
-      // Guest user, find cart by sessionId
-      cart = await Cart.findOne({ sessionId });
-      if (!cart) {
-        cart = new Cart({ sessionId, items: [] });
-      }
+    if (!product || product.stock < quantity) {
+      return res.status(400).json({ error: 'Insufficient stock or product not found' });
     }
 
-    // Calculate the total quantity for the product
-    const existingItemIndex = cart.items.findIndex(item => item.productId.equals(productId));
-    let totalQuantity = quantity;
-    if (existingItemIndex > -1) {
-      totalQuantity += cart.items[existingItemIndex].quantity;
-    }
-
-    // Check if the total quantity exceeds the product stock
-    if (product.stock < totalQuantity) {
-      return res.status(400).json({ error: 'Insufficient stock for the total quantity' });
-    }
-
-    // Check if the product already exists in the cart
-    if (existingItemIndex > -1) {
-      // Increase the quantity of the existing product
-      cart.items[existingItemIndex].quantity = totalQuantity;
+    
+    const existingItem = cart.items.find(item => item.productId.equals(productId));
+    if (existingItem) {
+      existingItem.quantity += quantity;
     } else {
       // Add new product to the cart
       cart.items.push({ productId, quantity });
@@ -70,7 +54,7 @@ exports.addItem = async (req, res) => {
   }
 };
 
-// Update the Product in the Cart
+// UpdateItem
 exports.updateItem = async (req, res) => {
   try {
     const { productId, quantity } = req.body;

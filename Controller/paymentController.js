@@ -1,7 +1,8 @@
+// Update for better validation and error handling
 const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
+require('dotenv').config(); // Load environment variables
 
-// Mock Payment Controller
 exports.mockPayment = (req, res) => {
     const { cardNumber, expiry, cvv, amount } = req.body;
 
@@ -9,7 +10,7 @@ exports.mockPayment = (req, res) => {
         return res.status(400).json({ message: 'Invalid payment details' });
     }
 
-    // Luhn's Algorithm to validate card number
+    // Simple credit card validation using Luhn's Algorithm
     const isValidCard = cardNumber.split('').reverse().reduce((sum, digit, idx) => {
         digit = parseInt(digit);
         if (idx % 2) digit *= 2;
@@ -22,10 +23,16 @@ exports.mockPayment = (req, res) => {
 
     // Simulate a successful payment
     const transactionId = `TXN-${Date.now()}`;
-    res.json({ message: 'Payment successful', transactionId });
+    res.status(200).json({
+        message: 'Payment successful',
+        transactionId,
+        orderDetails: {
+            id: `ORDER-${Date.now()}`,
+            amount,
+        },
+    });
 };
 
-// Invoice Generation Controller
 exports.generateInvoice = async (req, res) => {
     const { user, orderDetails, transactionId } = req.body;
 
@@ -33,31 +40,30 @@ exports.generateInvoice = async (req, res) => {
         return res.status(400).json({ message: 'Invalid invoice details' });
     }
 
-    // Create PDF
     const doc = new PDFDocument();
     const buffers = [];
     doc.on('data', buffers.push.bind(buffers));
     doc.on('end', async () => {
         const pdfData = Buffer.concat(buffers);
 
-        // Send email with Nodemailer
         const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: {
-              user: process.env.EMAIL_USER,
-              pass: process.env.EMAIL_PASS,
-          },
-      });
+            host: process.env.EMAIL_HOST,
+            port: process.env.EMAIL_PORT,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
+        });
 
         try {
             await transporter.sendMail({
-                from: 'your-email@gmail.com',
+                from: process.env.EMAIL_USER,
                 to: user.email,
                 subject: 'Your Invoice',
                 text: 'Find your invoice attached.',
                 attachments: [
                     {
-                        filename: 'invoice.pdf',
+                        filename: `invoice-${orderDetails.id}.pdf`,
                         content: pdfData,
                     },
                 ],

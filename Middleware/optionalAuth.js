@@ -1,35 +1,26 @@
 const jwt = require('jsonwebtoken');
 const User = require('../Models/User');
-require('dotenv').config();
 
 const optionalAuth = async (req, res, next) => {
   const { authorization } = req.headers;
 
   if (authorization) {
     const token = authorization.split(' ')[1];
-
+    console.log('Token:', token);
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, async (err, decodedToken) => {
-      if (err && err.name === 'TokenExpiredError') {
-        // Try to refresh the token
-        const cookies = req.cookies;
-        if (cookies?.jwt) {
-          const refreshToken = cookies.jwt;
-          const user = await User.findOne({ refreshToken });
-          if (!user) return res.status(403).json({ error: 'Refresh token invalid' });
-
-          // Generate a new access token
-          const newAccessToken = jwt.sign(
-            { email: user.email, id: user._id, role: user.role },
-            process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: '15m' }
-          );
-          req.user = user;
-          res.setHeader('Authorization', `Bearer ${newAccessToken}`);
-        }
-      } else if (!err) {
+      if (err) {
+        console.error('JWT verification failed:', err);
+        next(); // Proceed without attaching the user
+      } else {
+        console.log('Decoded token:', decodedToken);
         try {
           const user = await User.findById(decodedToken.id);
-          if (user) req.user = user;
+          if (user) {
+            req.user = user; // Attach the user to the request
+            console.log('User found and attached to req.user:', req.user);
+          } else {
+            console.log('User not found with id:', decodedToken.id);
+          }
         } catch (error) {
           console.error('Error finding user:', error);
         }

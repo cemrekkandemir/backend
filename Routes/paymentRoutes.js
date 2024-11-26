@@ -1,9 +1,11 @@
 const express = require('express');
-const { mockPayment, generateInvoice } = require('../Controller/paymentController'); // Correct destructured import
+const { mockPayment, generateInvoice } = require('../Controller/paymentController');
 const router = express.Router();
 
-// Define the payment routes
-router.post('/mock-payment', mockPayment); // Use the destructured function directly
-router.post('/generate-invoice', generateInvoice); // Use the destructured function directly
+router.post('/mock-payment', (req, res, next) => {
+    mockPayment(req, res);
+});
+
+router.post('/generate-invoice', generateInvoice);
 
 module.exports = router;
