@@ -42,3 +42,63 @@ exports.createProduct = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// Update comment visibility
+exports.updateCommentVisibility = async (req, res) => {
+    const { productId, feedbackId } = req.params;
+  
+    if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(feedbackId)) {
+      return res.status(400).json({ error: 'Invalid product or feedback ID' });
+    }
+  
+    try {
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+  
+      const feedback = product.feedback.id(feedbackId);
+      if (!feedback) {
+        return res.status(404).json({ error: 'Feedback not found' });
+      }
+  
+      if (!feedback.text) {
+        return res.status(400).json({ error: 'This feedback does not include a comment.' });
+      }
+  
+      feedback.isVisible = true;
+      await product.save();
+  
+      res.status(200).json({ message: 'Comment visibility updated.', feedback });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update comment visibility.' });
+    }
+  };
+  
+  // Get feedback for a product
+  exports.getFeedback = async (req, res) => {
+    const { productId } = req.params;
+  
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ error: 'Invalid product ID' });
+    }
+  
+    try {
+      const product = await Product.findById(productId).populate('feedback.user', 'name');
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+  
+      const visibleComments = product.feedback.filter(f => f.text && f.isVisible);
+      const ratingsOnly = product.feedback.filter(f => !f.text);
+  
+      res.status(200).json({
+        averageRating: product.averageRating,
+        visibleComments,
+        ratingsOnly,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get feedback.' });
+    }
+  };
+  
