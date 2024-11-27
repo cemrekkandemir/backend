@@ -43,28 +43,24 @@ exports.login = async (req, res) => {
     }
 
     // Compare the provided password with the hashed password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Generate a short-lived access token for the user
     const accessToken = jwt.sign(
-      { email: user.email, id: user._id, role: user.role },
+      { userId: user._id, role: user.role },
       process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '30s' }
+      { expiresIn: '15m' }
     );
 
     // Generate a long-lived refresh token for the user
     const refreshToken = jwt.sign(
-      { email: user.email, id: user._id },
+      { userId: user._id, role: user.role },
       process.env.REFRESH_TOKEN_SECRET,
       { expiresIn: '1d' }
     );
-
-    // Update user in database with the refresh token
-    user.refreshToken = refreshToken;
-    await user.save();
 
     // Store refresh token in an HTTP-only cookie
     res.cookie('jwt', refreshToken, {

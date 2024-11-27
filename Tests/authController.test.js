@@ -7,6 +7,9 @@ jest.mock('../Models/User');
 jest.mock('bcryptjs');
 jest.mock('jsonwebtoken');
 
+process.env.ACCESS_TOKEN_SECRET = 'your-access-token-secret';
+process.env.REFRESH_TOKEN_SECRET = 'your-refresh-token-secret';
+
 describe('authController', () => {
     describe('signup', () => {
         it('should return a success message on valid signup', async () => {
@@ -46,7 +49,6 @@ describe('authController', () => {
     });
 
     describe('login', () => {
-        //PROBLEM ON THIS TEST
         it('should return a success message on valid login', async () => {
             const req = { body: { email: 'test@example.com', password: 'password' } };
             const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), cookie: jest.fn() };
