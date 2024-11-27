@@ -148,4 +148,46 @@ exports.postComment = async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Failed to post comment.' });
     }
-};
+};};
+=======
+exports.searchAndFilterProducts = async (req, res) => {
+    try {
+      const { search, category, sort, order } = req.query;
+  
+      // Search conditions based on name and description
+      let query = {};
+      if (search) {
+        query = {
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } }
+          ]
+        };
+      }
+  
+      // Filtering by category if specified
+      if (category) {
+        query.category = category;
+      }
+  
+      // Sorting
+      let sortCondition = {};
+      if (sort) {
+        const sortOrder = order === 'desc' ? -1 : 1;
+        if (sort === 'price') {
+          sortCondition.price = sortOrder;
+        } else if (sort === 'popularity') {
+          sortCondition.popularity = sortOrder;
+        } else if (sort === 'name') {
+          sortCondition.name = sortOrder;
+        }
+      }
+  
+      // Fetching the products based on query and sort conditions
+      const products = await Product.find(query).sort(sortCondition);
+      res.status(200).json(products);
+    } catch (error) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  };
+>>>>>>> Stashed changes

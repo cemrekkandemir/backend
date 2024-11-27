@@ -5,6 +5,7 @@ router.get('/', productController.getAllProducts);
 
 // Get a single product by ID
 router.get('/:id', productController.getProductById);
+<<<<<<< Updated upstream
 
 // Create a new product
 router.post('/', productController.createProduct);
@@ -26,6 +27,11 @@ router.get('/:productId/feedback', productController.getFeedback);
 // Route to post a comment for a product
 router.post('/:productId/feedback', productController.postComment);
 
+=======
+// Route to create a new product
+router.post('/', productController.createProduct);
+//router.get('/:products', productController.searchAndFilterProducts);
+>>>>>>> Stashed changes
 
 module.exports = router;
 
