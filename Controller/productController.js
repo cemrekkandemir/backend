@@ -40,6 +40,7 @@ exports.createProduct = async (req, res) => {
     }
 };
 
+<<<<<<< Updated upstream
 // Update a product by ID (PUT)
 exports.updateProduct = async (req, res) => {
     try {
@@ -148,7 +149,7 @@ exports.postComment = async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Failed to post comment.' });
     }
-};};
+};
 =======
 exports.searchAndFilterProducts = async (req, res) => {
     try {
