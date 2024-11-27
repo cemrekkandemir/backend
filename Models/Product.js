@@ -17,8 +17,11 @@ const productSchema = new mongoose.Schema({
   brand: { type: String, required: true },
   stock: { type: Number, required: true },
   imageURL: { type: String, required: true },
-  feedback: [feedbackSchema], // Renamed for ratings + comments
+  feedback: [feedbackSchema],
   averageRating: { type: Number, default: 0 },
+  expirationDate: { type: Date, default: null }, // New Field
+  distributor: { type: String, default: null }, // New Field
+  serialNumber: { type: String, default: null }, // New Field
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
