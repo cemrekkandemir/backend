@@ -10,9 +10,6 @@ router.post('/signup', authController.signup);
 // Login
 router.post('/login', authController.login);
 
-// Refresh Token
-router.post('/refresh-token', authController.refreshToken);
-
 // Logout
 router.post('/logout', authController.logout);
 
