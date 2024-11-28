@@ -1,36 +1,76 @@
 const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
 const Joi = require('joi');
+const crypto = require('crypto');
+const creditCardType = require('credit-card-type');
 
-// Mock payment endpoint
-exports.mockPayment = (req, res) => {
+// Payment processing
+exports.mockPayment = async (req, res) => {
     const paymentSchema = Joi.object({
-        cardNumber: Joi.string().creditCard().required(),
+        cardNumber: Joi.string().required(),
         expiry: Joi.string().required(),
         cvv: Joi.string().length(3).required(),
         amount: Joi.number().positive().required(),
     });
 
     const { error } = paymentSchema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.details[0].message });
+    if (error) {
+        return res.status(400).json({ message: error.details[0].message });
+    }
 
     const { cardNumber, expiry, cvv, amount } = req.body;
 
-    // Simulate payment failure (10% chance)
-    if (Math.random() < 0.1) {
-        return res.status(400).json({ message: 'Payment failed. Please try again.' });
-    }
+    try {
+        // Validate and detect card type using credit-card-type
+        const cardDetails = creditCardType(cardNumber);
+        if (cardDetails.length === 0) {
+            return res.status(400).json({ message: 'Invalid card number' });
+        }
 
-    // Simulate a successful payment
-    const transactionId = `TXN-${Date.now()}`;
-    res.status(200).json({
-        message: 'Payment successful',
-        transactionId,
-        orderDetails: {
-            id: `ORDER-${Date.now()}`,
-            amount,
-        },
-    });
+        const cardType = cardDetails[0].type;
+        const validCardTypes = ['visa', 'mastercard', 'amex']; // Supported card types
+        if (!validCardTypes.includes(cardType)) {
+            return res.status(400).json({ message: `Unsupported card type: ${cardType}` });
+        }
+
+        // Validate expiry date format (MM/YY) and check if expired
+        const expiryRegex = /^(0[1-9]|1[0-2])\/\d{2}$/;
+        if (!expiryRegex.test(expiry)) {
+            return res.status(400).json({ message: 'Invalid expiry date format. Use MM/YY.' });
+        }
+
+        const [month, year] = expiry.split('/');
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1; // JS months are 0-indexed
+        const currentYear = currentDate.getFullYear() % 100; // Last two digits of the year
+
+        if (parseInt(year) < currentYear || (parseInt(year) === currentYear && parseInt(month) < currentMonth)) {
+            return res.status(400).json({ message: 'Card is expired' });
+        }
+
+        // Hash the card number for security
+        const hashedCardNumber = crypto.createHash('sha256').update(cardNumber).digest('hex');
+
+        // Simulate payment gateway processing
+        const paymentStatus = true; // Replace with real payment gateway result
+        const transactionId = `TXN-${Date.now()}`;
+
+        if (paymentStatus) {
+            res.status(200).json({
+                message: 'Payment successful',
+                transactionId,
+                orderDetails: {
+                    id: `ORDER-${Date.now()}`,
+                    amount,
+                },
+            });
+        } else {
+            res.status(400).json({ message: 'Payment failed. Please try again.' });
+        }
+    } catch (error) {
+        console.error('Error processing payment:', error);
+        res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
 };
 
 // Generate invoice endpoint
@@ -60,12 +100,12 @@ exports.generateInvoice = async (req, res) => {
         const pdfData = Buffer.concat(buffers);
 
         const transporter = nodemailer.createTransport({
-            host: process.env.EMAIL_HOST, // Gmail SMTP
+            host: process.env.EMAIL_HOST,
             port: process.env.EMAIL_PORT,
             secure: false, // Use true for port 465
             auth: {
-                user: process.env.EMAIL_USER, // Gmail address
-                pass: process.env.EMAIL_PASS, // Gmail App Password
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
             },
         });
 
