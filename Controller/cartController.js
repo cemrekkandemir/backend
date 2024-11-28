@@ -163,7 +163,7 @@ exports.viewCart = async (req, res) => {
 
     await cart.populate({
       path: 'items.productId',
-      select: 'name price stock'
+      select: 'name price stock imageURL'
     });
 
     console.log("Cart after populate:", cart);
