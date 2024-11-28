@@ -3,10 +3,6 @@
 const express = require('express');
 const router = express.Router();
 const cartController = require('../Controller/cartController');
-const optionalAuth = require('../Middleware/optionalAuth');
-
-
-router.use(optionalAuth);
 
 
 router.post('/add', cartController.addItem);
