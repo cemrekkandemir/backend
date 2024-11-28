@@ -1,11 +1,8 @@
 // cartRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const cartController = require('../Controller/cartController');
-const optionalAuth = require('../Middleware/optionalAuth');
-
-
-router.use(optionalAuth);
 
 
 router.post('/add', cartController.addItem);
@@ -14,3 +11,4 @@ router.delete('/remove', cartController.removeItem);
 router.get('/view', cartController.viewCart);
 
 module.exports = router;
+

@@ -1,20 +1,38 @@
+// Controller/authController.js
+
 const User = require('../Models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { mergeCarts } = require('../Middleware/cartMerger');
 require('dotenv').config();
 
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    { email: user.email, id: user._id, role: user.role },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: '1d' } // Access token time
+  );
+};
+
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    { email: user.email, id: user._id },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: '1d' } // Refresh token time 
+  );
+};
 
 exports.signup = async (req, res) => {
   try {
     const { name, email, password, address } = req.body;
 
-    // Check if the user already exists
+     // Check if the user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
-    // Hash the user's password
+     // Hash the user's password
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new User({
       name,
@@ -36,44 +54,48 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check if the user exists
+    // Store old sessionID
+    const oldSessionID = req.sessionID;
+    console.log("Session ID before login:", oldSessionID);
+
+    // Find the user 
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Compare the provided password with the hashed password
+    // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate a short-lived access token for the user
-    const accessToken = jwt.sign(
-      { email: user.email, id: user._id, role: user.role },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '30s' }
-    );
+    // Set userId without recreating session
+    req.session.userId = user._id;
 
-    // Generate a long-lived refresh token for the user
-    const refreshToken = jwt.sign(
-      { email: user.email, id: user._id },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: '1d' }
-    );
+    // Merge baskets
+    await mergeCarts(user._id, oldSessionID);
+    console.log(`Carts merged for user ${user._id} and guest ${oldSessionID}`);
 
-    // Update user in database with the refresh token
+    // Create access token
+    const accessToken = generateAccessToken(user);
+
+    // Create refresh token
+    const refreshToken = generateRefreshToken(user);
+
+    // Assign refresh token to user and save
     user.refreshToken = refreshToken;
     await user.save();
 
-    // Store refresh token in an HTTP-only cookie
+    // Store refresh token as HTTP-only cookie
     res.cookie('jwt', refreshToken, {
       httpOnly: true,
-      sameSite: 'None', 
-      secure: true,
-      maxAge: 24 * 60 * 60 * 1000 // 1 day
+      sameSite: 'lax',
+      secure: false, // Geliştirme ortamında false
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
 
+    // Return the access token and user information
     res.status(200).json({
       accessToken,
       user: {
@@ -83,9 +105,11 @@ exports.login = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Login Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 // Refresh Token API
 exports.refreshToken = async (req, res) => {
@@ -98,10 +122,11 @@ exports.refreshToken = async (req, res) => {
     const user = await User.findOne({ refreshToken });
     if (!user) return res.sendStatus(403); // Forbidden
 
-    // Verify the refresh token
+    // Validate refresh token
     jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
       if (err || user.email !== decoded.email) return res.sendStatus(403);
 
+      // Create a new access token
       const accessToken = jwt.sign(
         { email: user.email, id: user._id, role: user.role },
         process.env.ACCESS_TOKEN_SECRET,
@@ -114,16 +139,16 @@ exports.refreshToken = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 // Logout function
 exports.logout = async (req, res) => {
   const cookies = req.cookies;
 
   if (!cookies?.jwt) {
-    return res.status(200).json({ message: 'Successfully logged out' }); // Return 200 with a success message
+    return res.status(200).json({ message: 'Successfully logged out' }); 
   }
 
   const refreshToken = cookies.jwt;
-
   try {
     // Find the user with the given refresh token
     const user = await User.findOne({ refreshToken });
