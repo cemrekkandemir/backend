@@ -74,26 +74,26 @@ exports.getAllProducts = async (req, res) => {
 
 // Update comment visibility (PUT)
 exports.updateCommentVisibility = async (req, res) => {
-    const { productId, feedbackId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(feedbackId)) {
-        return res.status(400).json({ error: 'Invalid product or feedback ID' });
+    const { productId, commentId } = req.params;
+    console.log(`Received productId: ${productId}, commentId: ${commentId}`);
+    
+    if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(commentId)) {
+        return res.status(400).json({ error: 'Invalid product or comment ID' });
     }
     try {
         const product = await Product.findById(productId);
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
-        const feedback = product.feedback.id(feedbackId);
-        if (!feedback) {
-            return res.status(404).json({ error: 'Feedback not found' });
+        const comment = product.comments.id(commentId);
+        if (!comment) {
+            return res.status(404).json({ error: 'Comment not found' });
         }
-        if (!feedback.text) {
-            return res.status(400).json({ error: 'This feedback does not include a comment.' });
-        }
-        feedback.isVisible = true;
+        comment.isVisible = true;
         await product.save();
-        res.status(200).json({ message: 'Comment visibility updated.', feedback });
+        res.status(200).json({ message: 'Comment visibility updated.', comment });
     } catch (error) {
+        console.error(`Error updating comment visibility: ${error.message}`);
         res.status(500).json({ error: 'Failed to update comment visibility.' });
     }
 };
@@ -105,30 +105,29 @@ exports.getFeedback = async (req, res) => {
         return res.status(400).json({ error: 'Invalid product ID' });
     }
     try {
-        const product = await Product.findById(productId).populate('feedback.user', 'name');
+        const product = await Product.findById(productId).populate('comments.user', 'name').populate('ratings.user', 'name');
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
-        const visibleComments = product.feedback.filter(f => f.text && f.isVisible);
-        const ratingsOnly = product.feedback.filter(f => !f.text);
+        const visibleComments = product.comments.filter(c => c.isVisible);
         res.status(200).json({
             averageRating: product.averageRating,
             visibleComments,
-            ratingsOnly,
+            ratings: product.ratings,
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to get feedback.' });
     }
 };
 
-// Post a comment for a product (POST)
+// Post a comment or rating for a product (POST)
 exports.postComment = async (req, res) => {
     const { productId } = req.params;
-    const { userId, text, rating } = req.body;
+    const { userId, username, text, rating } = req.body;
     if (!mongoose.Types.ObjectId.isValid(productId) || !mongoose.Types.ObjectId.isValid(userId)) {
         return res.status(400).json({ error: 'Invalid product or user ID' });
     }
-    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+    if (rating && (typeof rating !== 'number' || rating < 1 || rating > 5)) {
         return res.status(400).json({ error: 'Rating must be a number between 1 and 5' });
     }
     try {
@@ -136,17 +135,63 @@ exports.postComment = async (req, res) => {
         if (!product) {
             return res.status(404).json({ error: 'Product not found' });
         }
-        const feedback = {
-            user: userId,
-            text,
-            rating,
-            isVisible: false
-        };
-        product.feedback.push(feedback);
+
+        // Check if the user has already commented
+        const hasCommented = product.comments.some(comment => comment.user.toString() === userId);
+        if (text && hasCommented) {
+            return res.status(400).json({ error: 'User has already commented on this product' });
+        }
+
+        // Check if the user has already rated
+        const hasRated = product.ratings.some(ratingEntry => ratingEntry.user.toString() === userId);
+        if (rating && hasRated) {
+            return res.status(400).json({ error: 'User has already rated this product' });
+        }
+
+        if (text) {
+            const comment = {
+                user: userId,
+                username,
+                text,
+                isVisible: false
+            };
+            product.comments.push(comment);
+        }
+
+        if (rating) {
+            const ratingEntry = {
+                user: userId,
+                rating
+            };
+            product.ratings.push(ratingEntry);
+
+            // Update average rating
+            const totalRatings = product.ratings.reduce((acc, r) => acc + r.rating, 0);
+            product.averageRating = totalRatings / product.ratings.length;
+        }
+
         await product.save();
-        res.status(201).json({ message: 'Comment added successfully.', feedback });
+        res.status(201).json({ message: 'Feedback added successfully.', product });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to post comment.' });
+        res.status(500).json({ error: 'Failed to post feedback.' });
     }
 };
 
+// Increase product popularity (PUT)
+exports.increasePopularity = async (req, res) => {
+    const { productId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ error: 'Invalid product ID' });
+    }
+    try {
+        const product = await Product.findById(productId);
+        if (!product) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        product.popularity += 1;
+        await product.save();
+        res.status(200).json({ message: 'Product popularity increased.', product });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to increase product popularity.' });
+    }
+};

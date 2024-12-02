@@ -25,7 +25,7 @@ const productSchema = new mongoose.Schema({
   comments: [commentSchema],
   ratings: [ratingSchema],
   averageRating: { type: Number, default: 0 },
-  popularity: { type: Number, default: 0 }, // New Field
+  popularity: { type: Number, default: 0 }, 
   expirationDate: { type: Date, default: null },
   distributor: { type: String, default: null },
   serialNumber: { type: String, default: null },
