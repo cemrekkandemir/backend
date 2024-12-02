@@ -67,6 +67,12 @@ exports.addItem = async (req, res) => {
     await cart.save();
     console.log("Cart saved successfully:", cart);
 
+    // Sepeti populate edin
+    await cart.populate({
+      path: 'items.productId',
+      select: 'name price stock imageURL'
+    });
+
     res.status(200).json(cart);
   } catch (error) {
     console.error('Error adding item to cart:', error);
@@ -116,6 +122,13 @@ exports.updateItem = async (req, res) => {
       // save
       await cart.save();
       console.log("Cart updated successfully:", cart);
+
+      // Sepeti populate edin
+      await cart.populate({
+        path: 'items.productId',
+        select: 'name price stock imageURL'
+      });
+
       res.status(200).json(cart);
     } else {
       console.log("Product not found in cart:", productId);
@@ -127,7 +140,7 @@ exports.updateItem = async (req, res) => {
   }
 };
 
-// remove Item
+// removeItem
 exports.removeItem = async (req, res) => {
   try {
     const { productId } = req.body;
@@ -141,6 +154,13 @@ exports.removeItem = async (req, res) => {
 
     if (cart.items.length < initialLength) {
       await cart.save();
+
+      // Sepeti populate edin
+      await cart.populate({
+        path: 'items.productId',
+        select: 'name price stock imageURL'
+      });
+
       res.status(200).json(cart);
     } else {
       res.status(404).json({ error: 'Product not found in the cart' });
