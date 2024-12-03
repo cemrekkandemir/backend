@@ -194,3 +194,28 @@ exports.viewCart = async (req, res) => {
     res.status(500).json({ error: 'Error viewing cart' });
   }
 };
+// clearCart
+
+exports.clearCart = async (req, res) => {
+  try {
+    console.log('clearCart function called');
+    const userId = req.user?._id || null;
+    const guestId = !userId ? req.guestId : null;
+
+    console.log('User ID:', userId);
+    console.log('Guest ID:', guestId);
+
+    const cart = await findOrCreateCart(userId, guestId);
+
+    cart.items = [];
+    await cart.save();
+
+    console.log('Cart cleared successfully:', cart);
+    res.status(200).json({ message: 'Cart cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing the cart:', error);
+    res.status(500).json({ error: 'Error clearing the cart' });
+  }
+};
+
+

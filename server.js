@@ -47,6 +47,7 @@ mongoose.connect(process.env.MONGO_URI)
 // Middleware: Set user or guestId
 app.use(setUser);
 
+
 app.use('/api/users', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);

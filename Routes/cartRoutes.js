@@ -11,6 +11,8 @@ router.post('/add', cartController.addItem);
 router.put('/update', cartController.updateItem);
 router.delete('/remove', cartController.removeItem);
 router.get('/view', cartController.viewCart);
+router.delete('/clear', cartController.clearCart);
+
 
 // Merge guest cart with authenticated user's cart
 router.post('/merge', authenticateToken, async (req, res) => {
