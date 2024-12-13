@@ -27,6 +27,12 @@ router.get('/:productId/feedback', productController.getFeedback);
 // Route to post a comment for a product
 router.post('/:productId/feedback', productController.postComment);
 
+// Route to increase popularity of a product
 router.put('/:productId/increase-popularity', productController.increasePopularity);
+
+// Route to get pending comments
+router.get('/comments/pending', productController.getPendingComments);
+// Route to delete a comment
+router.delete('/products/:productId/comments/:commentId', productController.rejectComment);
 
 module.exports = router;
