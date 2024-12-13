@@ -9,6 +9,9 @@ const authRoutes = require('./Routes/authRoutes');
 const productRoutes = require('./Routes/productRoutes');
 const cartRoutes = require('./Routes/cartRoutes');
 const orderRoutes = require('./Routes/orderRoutes');
+const paymentRoute = require('./Routes/paymentRoutes');
+const setUser = require('./Middleware/setUser'); 
+
 require('dotenv').config();
 
 const app = express();
@@ -16,21 +19,20 @@ const app = express();
 app.use(express.json());
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your_session_secret_key',
-  resave: false,
-  saveUninitialized: true, 
+  secret: process.env.SESSION_SECRET, 
+  resave: false, 
+  saveUninitialized: false, 
   store: MongoStore.create({
     mongoUrl: process.env.MONGO_URI,
     collectionName: 'sessions',
   }),
   cookie: {
     secure: false, 
-    httpOnly: false, 
+    httpOnly: true, 
     maxAge: 1000 * 60 * 60 * 24, 
     sameSite: 'lax', 
   },
 }));
-
 
 app.use(cors({
   origin: 'http://localhost:5173', // Allow requests from the frontend
@@ -42,11 +44,15 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('Database connected'))
   .catch((err) => console.log(err));
 
-// Routes
+// Middleware: Set user or guestId
+app.use(setUser);
+
+
 app.use('/api/users', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/payment', paymentRoute);
 
 // Start server
 const PORT = process.env.PORT || 5001;

@@ -1,43 +1,45 @@
-const mergeCarts = async (req, res, next) => {
-    try {
-      const userId = req.user?._id; 
-      const guestId = req.sessionID; 
-  
-      if (userId && guestId) {
-        console.log("Merging carts for userId:", userId, "and guestId:", guestId);
-  
-        const guestCart = await Cart.findOne({ guestId });
-        if (guestCart) {
-          
-          let userCart = await Cart.findOne({ userId });
-          if (!userCart) {
-            userCart = new Cart({ userId, items: [] });
-          }
-  
-          
-          guestCart.items.forEach(guestItem => {
-            const existingItem = userCart.items.find(item =>
-              item.productId.equals(guestItem.productId)
-            );
-            if (existingItem) {
-              existingItem.quantity += guestItem.quantity;
-            } else {
-              userCart.items.push(guestItem);
-            }
-          });
+// Utils/cartMerger.js
 
-          await guestCart.deleteOne();
-          await userCart.save();
-  
-          console.log("Carts merged successfully.");
+const Cart = require('../Models/Cart');
+
+const mergeCarts = async (userId, guestId) => {
+  try {
+    const guestCart = await Cart.findOne({ guestId });
+    const userCart = await Cart.findOne({ userId });
+
+    if (guestCart && guestCart.items.length > 0) {
+      if (!userCart) {
+        // Misafir sepetini kullanıcı sepeti olarak kaydet
+        guestCart.userId = userId;
+        guestCart.guestId = null;
+        await guestCart.save();
+      } else {
+        // Misafir sepetindeki öğeleri kullanıcı sepetine ekle
+        for (const guestItem of guestCart.items) {
+          const existingItemIndex = userCart.items.findIndex(item =>
+            item.productId.equals(guestItem.productId)
+          );
+
+          if (existingItemIndex > -1) {
+            // Ürün zaten kullanıcı sepetinde varsa, miktarı güncelle
+            userCart.items[existingItemIndex].quantity += guestItem.quantity;
+          } else {
+            // Ürün kullanıcı sepetinde yoksa, ekle
+            userCart.items.push(guestItem);
+          }
         }
+
+        await userCart.save();
       }
-  
-      next();
-    } catch (error) {
-      console.error("Error merging carts:", error);
-      next(error);
+
+      // **Misafir sepetini sil**
+      await Cart.deleteOne({ _id: guestCart._id });
+      console.log(`Misafir sepeti silindi: ${guestCart._id}`);
     }
-  };
-  
-  module.exports = mergeCarts;
+  } catch (error) {
+    console.error('Sepetleri birleştirirken hata oluştu:', error);
+    throw error;
+  }
+};
+
+module.exports = { mergeCarts };

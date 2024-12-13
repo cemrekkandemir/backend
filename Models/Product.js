@@ -1,11 +1,16 @@
 const mongoose = require('mongoose');
 
-
-const feedbackSchema = new mongoose.Schema({
+const commentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  text: { type: String },
-  rating: { type: Number, required: true, min: 1, max: 5 }, // Rating is required
-  isVisible: { type: Boolean, default: false }, // Visibility flag for comments only
+  username: { type: String, required: true },
+  text: { type: String, required: true },
+  isVisible: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+});
+
+const ratingSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  rating: { type: Number, required: true, min: 1, max: 5 },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -17,8 +22,13 @@ const productSchema = new mongoose.Schema({
   brand: { type: String, required: true },
   stock: { type: Number, required: true },
   imageURL: { type: String, required: true },
-  feedback: [feedbackSchema], // Renamed for ratings + comments
+  comments: [commentSchema],
+  ratings: [ratingSchema],
   averageRating: { type: Number, default: 0 },
+  popularity: { type: Number, default: 0 }, 
+  expirationDate: { type: Date, default: null },
+  distributor: { type: String, default: null },
+  serialNumber: { type: String, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
