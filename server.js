@@ -35,7 +35,7 @@ app.use(session({
 }));
 
 // CORS configuration to allow multiple frontend ports
-const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174']; // Add all required frontend origins
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175']; // Add all required frontend origins
 
 app.use(cors({
   origin: function (origin, callback) {
