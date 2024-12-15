@@ -19,7 +19,7 @@ router.delete('/:id', productController.deleteProduct);
 router.post('/create-multiple', productController.createProducts);
 
 // Route to update comment visibility
-router.put('/:productId/feedback/:commentId/visibility', productController.updateCommentVisibility);
+router.put('/comments/:productId/feedback/:commentId/approve', productController.updateCommentVisibility);
 
 // Route to get feedback for a product
 router.get('/:productId/feedback', productController.getFeedback);
@@ -34,6 +34,6 @@ router.put('/:productId/increase-popularity', productController.increasePopulari
 router.get('/comments/pending', productController.getPendingComments);
 
 // Route to reject a comment
-router.delete('/products/:productId/comments/:commentId',productController.rejectComment);
+router.delete('/comments/:productId/comments/:commentId/reject',productController.rejectComment);
 
 module.exports = router;
