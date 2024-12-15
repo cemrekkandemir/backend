@@ -195,3 +195,44 @@ exports.increasePopularity = async (req, res) => {
         res.status(500).json({ error: 'Failed to increase product popularity.' });
     }
 };
+
+exports.getPendingComments = async (req, res) => {
+    try {
+      const pendingComments = await Product.aggregate([
+        { $unwind: '$comments' },
+        { $match: { 'comments.isVisible': false } },
+        {
+          $project: {
+            _id: 0,
+            productId: '$_id',
+            commentId: '$comments._id',
+            text: '$comments.text',
+            username: '$comments.username',
+            createdAt: '$comments.createdAt',
+          },
+        },
+      ]);
+  
+      res.status(200).json(pendingComments);
+    } catch (error) {
+      console.error('Error fetching pending comments:', error);
+      res.status(500).json({ error: 'Failed to fetch pending comments' });
+    }
+  };
+
+exports.rejectComment = async (req, res) => {
+    try {
+      const { productId, commentId } = req.params;
+  
+      // Removes the comment with the specified ID from the comments array
+      await Product.updateOne(
+        { _id: productId },
+        { $pull: { comments: { _id: commentId } } }
+      );
+  
+      res.status(200).json({ message: 'Comment rejected and removed successfully' });
+    } catch (error) {
+      console.error('Error rejecting comment:', error);
+      res.status(500).json({ error: 'Failed to reject and remove comment' });
+    }
+  };
