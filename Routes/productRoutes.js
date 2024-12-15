@@ -31,9 +31,9 @@ router.put('/:productId/increase-popularity', productController.increasePopulari
 
 
 // Route to fetch pending comments
-router.get('/comments/pending', commentsController.getPendingComments);
+router.get('/comments/pending', productController.getPendingComments);
 
 // Route to reject a comment
-router.delete('/products/:productId/comments/:commentId',commentsController.rejectComment);
+router.delete('/products/:productId/comments/:commentId',productController.rejectComment);
 
 module.exports = router;
