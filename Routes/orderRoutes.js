@@ -8,4 +8,5 @@ router.post('/place', auth, orderController.placeOrder);
 router.put('/:orderId/status', orderController.updateOrderStatus);
 router.get('/status', orderController.getLatestOrderStatus);
 router.get('/all', orderController.getAllOrders);
+router.get('/admin/all', orderController.getAllOrdersAdmin);
 module.exports = router;
