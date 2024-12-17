@@ -1,32 +1,48 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../Controller/productController');
+const auth = require('../Middleware/auth');
+const requireProductManager = require('../Middleware/requireProductManager');
 
 router.get('/', productController.getAllProducts);
 
-// Get a single product by ID
 router.get('/:id', productController.getProductById);
 
-// Create a new product
-router.post('/', productController.createProduct);
+router.post('/', auth, requireProductManager, productController.createProduct);
 
-// Update a product by ID
-router.put('/:id', productController.updateProduct);
+router.put('/:id', auth, requireProductManager, productController.updateProduct);
 
-// Delete a product by ID
-router.delete('/:id', productController.deleteProduct);
+router.delete('/:id', auth, requireProductManager, productController.deleteProduct);
 
-router.post('/create-multiple', productController.createProducts);
+router.post('/create-multiple', auth, requireProductManager, productController.createProducts);
 
-// Route to update comment visibility
-router.put('/:productId/feedback/:commentId/visibility', productController.updateCommentVisibility);
+router.put('/:productId/feedback/:commentId/visibility', auth, requireProductManager, productController.updateCommentVisibility);
 
-// Route to get feedback for a product
 router.get('/:productId/feedback', productController.getFeedback);
 
-// Route to post a comment for a product
-router.post('/:productId/feedback', productController.postComment);
+router.post('/:productId/feedback', auth, productController.postComment);
 
 router.put('/:productId/increase-popularity', productController.increasePopularity);
+
+router.put('/:id/stock', auth, requireProductManager, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { stock } = req.body;
+    const Product = require('../Models/Product'); 
+    
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id, 
+      { stock }, 
+      { new: true }
+    );
+
+    if (!updatedProduct) return res.status(404).json({ error: 'Product not found' });
+
+    res.status(200).json({ message: 'Stock updated successfully', product: updatedProduct });
+  } catch (error) {
+    console.error('Error updating stock:', error);
+    res.status(500).json({ error: 'Error updating stock' });
+  }
+});
 
 module.exports = router;
