@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const cartController = require('../Controller/cartController');
-const authenticateToken = require('../Middleware/auth'); // Adjust the path as needed
+const { requireAuth } = require('../Middleware/auth'); // Adjust the path as needed
 const Cart = require('../Models/Cart'); // Adjust the path as needed
 const Product = require('../Models/Product'); // Adjust the path as needed, if you add product existence checks
 
@@ -15,7 +15,7 @@ router.delete('/clear', cartController.clearCart);
 
 
 // Merge guest cart with authenticated user's cart
-router.post('/merge', authenticateToken, async (req, res) => {
+router.post('/merge', requireAuth, async (req, res) => {
   try {
     const userId = req.user._id;
     const guestCartItems = req.body.guestCart;

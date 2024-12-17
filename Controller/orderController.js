@@ -211,3 +211,53 @@ exports.getAllOrdersAdmin = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+exports.getRevenueAndProfitLoss = async (req, res) => {
+  try {
+    const { start, end } = req.query;
+
+    if (!start || !end) {
+      return res.status(400).json({ error: "Start and end dates are required" });
+    }
+
+    
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+  
+    const orders = await Order.find({
+      createdAt: { $gte: startDate, $lte: endDate },
+    });
+
+    
+    let totalRevenue = 0;
+    let totalProfit = 0;
+    let totalLoss = 0;
+
+    
+    orders.forEach((order) => {
+      totalRevenue += order.totalAmount;
+
+      const cost = order.totalAmount * 0.7;
+
+      const profit = order.totalAmount - cost;
+      if (profit > 0) {
+        totalProfit += profit;
+      } else {
+        totalLoss += Math.abs(profit);
+      }
+    });
+
+    const responseData = {
+      labels: ["Revenue", "Profit", "Loss"],
+      revenue: [totalRevenue],
+      profit: [totalProfit],
+      loss: [totalLoss],
+    };
+
+    return res.status(200).json(responseData);
+  } catch (error) {
+    console.error("Failed to calculate revenue:", error.message);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};

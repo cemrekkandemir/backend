@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../Controller/productController');
-
+const { requireAuth, requireSalesManager } = require('../Middleware/auth');
 router.get('/', productController.getAllProducts);
 
 // Get a single product by ID
@@ -35,5 +35,9 @@ router.get('/comments/pending', productController.getPendingComments);
 
 // Route to reject a comment
 router.delete('/comments/:productId/:commentId/reject',productController.rejectComment);
+
+router.put('/:id/price', requireAuth, requireSalesManager, productController.setPrice);
+
+router.put('/:id/discount', requireAuth, requireSalesManager, productController.applyDiscount);
 
 module.exports = router;

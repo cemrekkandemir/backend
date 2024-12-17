@@ -236,3 +236,43 @@ exports.rejectComment = async (req, res) => {
       res.status(500).json({ error: 'Failed to reject and remove comment' });
     }
   };
+  exports.setPrice = async (req, res) => {
+    const { id } = req.params;
+    const { price } = req.body;
+
+    if (!price || price <= 0) {
+        return res.status(400).json({ message: "Invalid price value." });
+    }
+
+    try {
+        const product = await Product.findByIdAndUpdate(id, { price }, { new: true });
+        if (!product) {
+            return res.status(404).json({ message: "Product not found." });
+        }
+        res.status(200).json({ message: "Price updated successfully", price: product.price });
+    } catch (error) {
+        res.status(500).json({ message: "Error updating price", error: error.message });
+    }
+};
+
+// Apply Discount to a Product
+exports.applyDiscount = async (req, res) => {
+    const { id } = req.params;
+    const { discountPercentage } = req.body;
+
+    if (!discountPercentage || discountPercentage <= 0 || discountPercentage > 100) {
+        return res.status(400).json({ message: "Invalid discount percentage." });
+    }
+    try {
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({ message: "Product not found." });
+        }
+        const discountedPrice = product.price - (product.price * discountPercentage) / 100;
+        product.price = discountedPrice;
+        await product.save();
+        res.status(200).json({ message: "Discount applied successfully", price: product.price });
+    } catch (error) {
+        res.status(500).json({ message: "Error applying discount", error: error.message });
+    }
+};
