@@ -9,15 +9,14 @@ const cartRoutes = require('./Routes/cartRoutes');
 const orderRoutes = require('./Routes/orderRoutes');
 const paymentRoute = require('./Routes/paymentRoutes');
 const setUser = require('./Middleware/setUser'); 
+const wishlistRoutes = require('./Routes/wishlistRoutes');
 
 require('dotenv').config();
-
 const app = express();
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175']; 
 
-// Middleware for parsing JSON
 app.use(express.json());
 
-// Configure session management
 app.use(session({
   secret: process.env.SESSION_SECRET, 
   resave: false, 
@@ -27,15 +26,12 @@ app.use(session({
     collectionName: 'sessions',
   }),
   cookie: {
-    secure: false, // Set true in production when using HTTPS
+    secure: false, 
     httpOnly: true, 
-    maxAge: 1000 * 60 * 60 * 24, // 1 day
+    maxAge: 1000 * 60 * 60 * 24, 
     sameSite: 'lax', 
   },
 }));
-
-// CORS configuration to allow multiple frontend ports
-const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175']; // Add all required frontend origins
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -45,37 +41,37 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true, // Allow cookies and authorization headers
+  credentials: true, 
 }));
 
-// Connect to the database
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('Database connected'))
-  .catch((err) => console.log(err));
-
-// Middleware to set user or guestId
 app.use(setUser);
 
-// API routes
 app.use('/api/users', authRoutes);
+
 app.use('/api/products', productRoutes);
+
 app.use('/api/cart', cartRoutes);
+
 app.use('/api/orders', orderRoutes);
+
 app.use('/api/payment', paymentRoute);
 
-// Error handling for unhandled routes
+app.use('/api/wishlist', wishlistRoutes);
+
 app.use((req, res, next) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'An internal server error occurred' });
 });
 
-// Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Database connected'))
+  .catch((err) => console.log(err));
