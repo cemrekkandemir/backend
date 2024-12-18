@@ -1,7 +1,7 @@
 const Order = require('../Models/Order');
 const Cart = require('../Models/Cart');
 const Product = require('../Models/Product');
-const PDFDocument = require('pdfkit'); // Make sure pdfkit is installed: npm install pdfkit
+const PDFDocument = require('pdfkit');
 
 // Place Order
 exports.placeOrder = async (req, res) => {
@@ -324,7 +324,6 @@ exports.getInvoicesPDFByDateRange = async (req, res) => {
   }
 };
 
-// Get Revenue and Profit/Loss
 exports.getRevenueAndProfitLoss = async (req, res) => {
   try {
     const { start, end } = req.query;
@@ -344,7 +343,7 @@ exports.getRevenueAndProfitLoss = async (req, res) => {
     let totalProfit = 0;
     let totalLoss = 0;
 
-    // For simplicity, cost assumed at 70% of totalAmount
+ 
     orders.forEach((order) => {
       totalRevenue += order.totalAmount;
       const cost = order.totalAmount * 0.7;
