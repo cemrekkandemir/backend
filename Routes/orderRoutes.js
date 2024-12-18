@@ -9,5 +9,9 @@ router.put('/:orderId/status', orderController.updateOrderStatus);
 router.get('/status', orderController.getLatestOrderStatus);
 router.get('/all', orderController.getAllOrders);
 router.get('/admin/all', orderController.getAllOrdersAdmin);
+router.get('/invoices/date-range', requireAuth, requireSalesManager, orderController.getInvoicesByDateRange);
+router.get('/invoices/pdf/date-range', requireAuth, requireSalesManager, orderController.getInvoicesPDFByDateRange);
 router.get('/revenue', requireAuth, requireSalesManager, orderController.getRevenueAndProfitLoss);
+
 module.exports = router;
+

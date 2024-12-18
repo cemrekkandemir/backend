@@ -1,6 +1,7 @@
 const Order = require('../Models/Order');
 const Cart = require('../Models/Cart');
 const Product = require('../Models/Product');
+const PDFDocument = require('pdfkit'); // Make sure pdfkit is installed: npm install pdfkit
 
 // Place Order
 exports.placeOrder = async (req, res) => {
@@ -65,6 +66,7 @@ exports.placeOrder = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 // Update Order Status
 exports.updateOrderStatus = async (req, res) => {
   const { orderId } = req.params;
@@ -76,7 +78,6 @@ exports.updateOrderStatus = async (req, res) => {
   }
 
   try {
-    // Find the order by ID
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
@@ -93,6 +94,7 @@ exports.updateOrderStatus = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 // Get Latest Order Status
 exports.getLatestOrderStatus = async (req, res) => {
   try {
@@ -127,10 +129,11 @@ exports.getLatestOrderStatus = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+// Get All Orders for the authenticated user
 exports.getAllOrders = async (req, res) => {
   try {
     const userId = req.user?._id;
-
     if (!userId) {
       return res.status(400).json({ error: "User ID is missing." });
     }
@@ -171,7 +174,6 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
-
 // Get All Orders (Admin View)
 exports.getAllOrdersAdmin = async (req, res) => {
   try {
@@ -188,7 +190,7 @@ exports.getAllOrdersAdmin = async (req, res) => {
 
     const formattedOrders = orders.map((order) => ({
       orderId: order._id,
-      user: order.user, 
+      user: order.user,
       status: order.orderStatus,
       createdAt: order.createdAt,
       estimatedDelivery:
@@ -212,6 +214,117 @@ exports.getAllOrdersAdmin = async (req, res) => {
   }
 };
 
+// Get invoices within a given date range
+exports.getInvoicesByDateRange = async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      error: 'Please provide startDate and endDate query parameters (YYYY-MM-DD format)',
+    });
+  }
+
+  try {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const orders = await Order.find({
+      createdAt: {
+        $gte: start,
+        $lte: end,
+      },
+    })
+      .sort({ createdAt: -1 })
+      .populate('user', 'name email')
+      .populate('products.productId', 'name price');
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ error: 'No invoices found in the given date range.' });
+    }
+
+    const formattedInvoices = orders.map((order) => ({
+      invoiceId: order._id,
+      userName: order.user?.name || 'Unknown User',
+      userEmail: order.user?.email || 'No Email',
+      totalAmount: order.totalAmount,
+      status: order.orderStatus,
+      createdAt: order.createdAt,
+      products: order.products.map((item) => ({
+        name: item.productId?.name || 'Unknown Product',
+        quantity: item.quantity,
+        price: item.productId?.price || 0,
+      })),
+    }));
+
+    res.status(200).json(formattedInvoices);
+  } catch (error) {
+    console.error('Error fetching invoices by date range:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// Get Invoices PDF within a given date range
+exports.getInvoicesPDFByDateRange = async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      error: 'Please provide startDate and endDate query parameters (YYYY-MM-DD format)',
+    });
+  }
+
+  try {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const orders = await Order.find({
+      createdAt: { $gte: start, $lte: end },
+    })
+      .sort({ createdAt: -1 })
+      .populate('user', 'name email')
+      .populate('products.productId', 'name price');
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).json({ error: 'No invoices found in the given date range.' });
+    }
+
+    const doc = new PDFDocument();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="invoices_${startDate}_to_${endDate}.pdf"`);
+
+    doc.pipe(res);
+
+    doc.fontSize(20).text(`Invoices from ${startDate} to ${endDate}`, { underline: true });
+    doc.moveDown();
+
+    orders.forEach((order, index) => {
+      doc.fontSize(16).text(`Invoice #${index + 1}`, { underline: true });
+      doc.text(`Invoice ID: ${order._id}`);
+      doc.text(`User: ${order.user?.name || 'Unknown User'} (${order.user?.email || 'No Email'})`);
+      doc.text(`Status: ${order.orderStatus}`);
+      doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`);
+      doc.text(`Total Amount: $${order.totalAmount}`);
+      doc.moveDown().fontSize(14).text('Products:', { underline: true });
+
+      order.products.forEach((item) => {
+        const productName = item.productId?.name || 'Unknown Product';
+        const productPrice = item.productId?.price || 0;
+        doc.text(`- ${productName}: ${item.quantity} x $${productPrice}`);
+      });
+
+      doc.moveDown(2);
+    });
+
+    doc.end();
+  } catch (error) {
+    console.error('Error generating invoices PDF by date range:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// Get Revenue and Profit/Loss
 exports.getRevenueAndProfitLoss = async (req, res) => {
   try {
     const { start, end } = req.query;
@@ -220,26 +333,21 @@ exports.getRevenueAndProfitLoss = async (req, res) => {
       return res.status(400).json({ error: "Start and end dates are required" });
     }
 
-    
     const startDate = new Date(start);
     const endDate = new Date(end);
 
-  
     const orders = await Order.find({
       createdAt: { $gte: startDate, $lte: endDate },
     });
 
-    
     let totalRevenue = 0;
     let totalProfit = 0;
     let totalLoss = 0;
 
-    
+    // For simplicity, cost assumed at 70% of totalAmount
     orders.forEach((order) => {
       totalRevenue += order.totalAmount;
-
       const cost = order.totalAmount * 0.7;
-
       const profit = order.totalAmount - cost;
       if (profit > 0) {
         totalProfit += profit;
