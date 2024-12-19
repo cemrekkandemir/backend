@@ -161,11 +161,13 @@ exports.getAllOrders = async (req, res) => {
           : "Delivered",
       totalAmount: order.totalAmount,
       products: order.products.map((product) => ({
+        productId: product.productId?._id, // Include the productId
         name: product.productId?.name || "Unknown Product",
         quantity: product.quantity,
         price: product.productId?.price || 0,
       })),
     }));
+    
 
     res.status(200).json(formattedOrders);
   } catch (error) {
@@ -368,3 +370,91 @@ exports.getRevenueAndProfitLoss = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+exports.requestRefund = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { orderId } = req.params;
+    const { productId } = req.body;
+
+    // Validate input
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is missing." });
+    }
+    if (!productId) {
+      return res.status(400).json({ error: "Product ID is required." });
+    }
+
+    // Find the order and populate products
+    const order = await Order.findOne({ _id: orderId, user: userId }).populate({
+      path: "products.productId",
+      select: "name price stock",
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found." });
+    }
+
+    // Check if the product exists in the order
+    const productInOrder = order.products.find(
+      (item) => item.productId && item.productId._id.toString() === productId
+    );
+
+    if (!productInOrder) {
+      return res.status(400).json({ error: "Product not found in order." });
+    }
+
+    // Check if the refund request is within 30 days
+    const purchaseDate = new Date(order.createdAt);
+    const currentDate = new Date();
+    const daysDifference = Math.ceil((currentDate - purchaseDate) / (1000 * 60 * 60 * 24));
+    if (daysDifference > 30) {
+      return res.status(400).json({ error: "Refund request exceeds 30-day return policy." });
+    }
+
+    // Calculate the refund amount
+    const refundAmount = productInOrder.productId.price * productInOrder.quantity;
+
+
+    // Update product stock
+    const product = await Product.findById(productId);
+    if (product) {
+      product.stock += productInOrder.quantity;
+      await product.save();
+    } else {
+      return res.status(404).json({ error: "Product not found in inventory." });
+    }
+
+    // Update the order: remove the refunded product and adjust the total amount
+    order.products = order.products.filter(
+      (item) => item.productId._id.toString() !== productId
+    );
+    order.totalAmount -= refundAmount;
+
+    // If all products are refunded, update order status to "refunded"
+    if (order.products.length === 0) {
+      order.orderStatus = "refunded";
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      message: "Refund processed successfully.",
+      refundedAmount: refundAmount,
+      updatedOrder: {
+        orderId: order._id,
+        status: order.orderStatus,
+        totalAmount: order.totalAmount,
+        products: order.products.map((item) => ({
+          name: item.productId.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Refund request error:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+

@@ -10,7 +10,7 @@ const orderSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true },
   orderStatus: {
     type: String,
-    enum: ['processing', 'in-transit', 'delivered'],
+    enum: ['processing', 'in-transit', 'delivered', 'refunded'],
     default: 'processing',
   },
   address: {
