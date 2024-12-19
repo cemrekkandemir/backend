@@ -13,6 +13,7 @@ router.get('/invoices/date-range', requireAuth, requireSalesManager, orderContro
 router.get('/invoices/pdf/date-range', requireAuth, requireSalesManager, orderController.getInvoicesPDFByDateRange);
 router.get('/revenue', requireAuth, requireSalesManager, orderController.getRevenueAndProfitLoss);
 router.post('/:orderId/refund', requireAuth, orderController.requestRefund);
+router.get('/delivery-list', orderController.getDeliveryList);
 
 module.exports = router;
 

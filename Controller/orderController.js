@@ -458,3 +458,36 @@ exports.requestRefund = async (req, res) => {
 };
 
 
+// Delivery List Controller
+exports.getDeliveryList = async (req, res) => {
+  try {
+    // Sadece gerekli siparişleri (delivered) seçiyoruz
+    const orders = await Order.find({  orderStatus: { $in: ['delivered', 'in-transit'] } })
+      .select("user products totalAmount address orderStatus createdAt")
+      .populate("user", "_id name email") // User ID ve diğer bilgileri alıyoruz
+      .populate("products.productId", "name price"); // Ürün bilgisi
+
+    // Teslimat verilerini formatlıyoruz
+    const deliveryList = orders.map((order) => ({
+      deliveryId: order._id,
+      customerId: order.user?._id || "Unknown ID", // User ID ekledik
+      customerName: order.user?.name || "Unknown Customer",
+      products: order.products.map((product) => ({
+        productId: product.productId?._id || "Unknown ID",
+        productName: product.productId?.name || "Unknown Product",
+        quantity: product.quantity || 0,
+      })),
+      totalPrice: order.totalAmount,
+      deliveryAddress: `${order.address.name}, ${order.address.address}, ${order.address.city}, ${order.address.postalCode}, ${order.address.country}`,
+      isCompleted: order.orderStatus === 'delivered',
+    }));
+
+    res.status(200).json(deliveryList);
+  } catch (error) {
+    console.error("Error fetching delivery list:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+
+
