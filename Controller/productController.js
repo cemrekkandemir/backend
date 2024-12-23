@@ -1,3 +1,5 @@
+const User = require("../Models/User"); 
+const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
 const Product = require('../Models/Product');
 
@@ -193,5 +195,121 @@ exports.increasePopularity = async (req, res) => {
         res.status(200).json({ message: 'Product popularity increased.', product });
     } catch (error) {
         res.status(500).json({ error: 'Failed to increase product popularity.' });
+    }
+};
+
+exports.getPendingComments = async (req, res) => {
+    try {
+      const pendingComments = await Product.aggregate([
+        { $unwind: '$comments' },
+        { $match: { 'comments.isVisible': false } },
+        {
+          $project: {
+            _id: 0,
+            productId: '$_id',
+            commentId: '$comments._id',
+            text: '$comments.text',
+            username: '$comments.username',
+            createdAt: '$comments.createdAt',
+          },
+        },
+      ]);
+  
+      res.status(200).json(pendingComments);
+    } catch (error) {
+      console.error('Error fetching pending comments:', error);
+      res.status(500).json({ error: 'Failed to fetch pending comments' });
+    }
+  };
+
+exports.rejectComment = async (req, res) => {
+    try {
+      const { productId, commentId } = req.params;
+  
+      // Removes the comment with the specified ID from the comments array
+      await Product.updateOne(
+        { _id: productId },
+        { $pull: { comments: { _id: commentId } } }
+      );
+  
+      res.status(200).json({ message: 'Comment rejected and removed successfully' });
+    } catch (error) {
+      console.error('Error rejecting comment:', error);
+      res.status(500).json({ error: 'Failed to reject and remove comment' });
+    }
+  };
+  exports.setPrice = async (req, res) => {
+    const { id } = req.params;
+    const { price } = req.body;
+
+    if (!price || price <= 0) {
+        return res.status(400).json({ message: "Invalid price value." });
+    }
+
+    try {
+        const product = await Product.findByIdAndUpdate(id, { price }, { new: true });
+        if (!product) {
+            return res.status(404).json({ message: "Product not found." });
+        }
+        res.status(200).json({ message: "Price updated successfully", price: product.price });
+    } catch (error) {
+        res.status(500).json({ message: "Error updating price", error: error.message });
+    }
+};
+const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT,
+    secure: false, 
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+    },
+});
+
+exports.applyDiscount = async (req, res) => {
+    const { id } = req.params;
+    const { discountPercentage } = req.body;
+
+    if (!discountPercentage || discountPercentage <= 0 || discountPercentage > 100) {
+        return res.status(400).json({ message: "Invalid discount percentage." });
+    }
+
+    try {
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({ message: "Product not found." });
+        }
+
+        const discountedPrice = product.price - (product.price * discountPercentage) / 100;
+        product.price = discountedPrice;
+        await product.save();
+
+        const usersWithProduct = await User.find({ wishlist: id });
+        const emailPromises = usersWithProduct.map((user) => {
+            const mailOptions = {
+                from: `"Vegan Eats Shop" <${process.env.EMAIL_USER}>`,
+                to: user.email,
+                subject: "Great news! A product in your wishlist is on discount 🎉",
+                text: `Dear ${user.name},\n\nThe product "${product.name}" in your wishlist is now available at a discounted price: $${discountedPrice.toFixed(2)}.\n\nHurry up and grab it while the offer lasts!\n\nBest regards,\nVegan Eats Team`,
+                html: `
+                    <p>Dear <strong>${user.name}</strong>,</p>
+                    <p>The product <strong>"${product.name}"</strong> in your wishlist is now available at a discounted price: <strong>$${discountedPrice.toFixed(2)}</strong>.</p>
+                    <p>Hurry up and grab it while the offer lasts!</p>
+                    <p>Best regards,<br><strong>Vegan Eats Team</strong></p>
+                `,
+            };
+
+            return transporter.sendMail(mailOptions);
+        });
+
+        await Promise.all(emailPromises);
+
+        res.status(200).json({
+            message: "Discount applied successfully. Notification emails sent.",
+            price: product.price,
+        });
+    } catch (error) {
+        console.error("Error applying discount:", error.message);
+        res.status(500).json({ message: "Error applying discount", error: error.message });
     }
 };

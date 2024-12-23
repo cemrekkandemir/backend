@@ -49,59 +49,64 @@ exports.signup = async (req, res) => {
   }
 };
 
-// Login API with Access and Refresh Token
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Store old sessionID
     const oldSessionID = req.sessionID;
-    console.log("Session ID before login:", oldSessionID);
 
-    // Find the user 
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Set userId without recreating session
+    // If the user is a sales manager, we don't set cookies and tokens in the main site
+    if (user.role === 'sales_manager') {
+      // Just generate an access token but do not set refresh token cookie
+      const accessToken = generateAccessToken(user);
+      return res.status(200).json({
+        accessToken,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          address: user.address,
+          role: user.role,
+          accessToken: accessToken
+        }
+      });
+    }
+
+    // For other users, proceed as normal: set the session, merge carts, set cookies
     req.session.userId = user._id;
-
-    // Merge baskets
     await mergeCarts(user._id, oldSessionID);
-    console.log(`Carts merged for user ${user._id} and guest ${oldSessionID}`);
 
-    // Create access token
     const accessToken = generateAccessToken(user);
-
-    // Create refresh token
     const refreshToken = generateRefreshToken(user);
 
-    // Assign refresh token to user and save
     user.refreshToken = refreshToken;
     await user.save();
 
-    // Store refresh token as HTTP-only cookie
     res.cookie('jwt', refreshToken, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: false, // Geliştirme ortamında false
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      secure: false,
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
-    // Return the access token and user information
     res.status(200).json({
       accessToken,
       user: {
+        id: user._id,
         name: user.name,
         email: user.email,
-        address: user.address
+        address: user.address,
+        role: user.role,
+        accessToken: accessToken
       }
     });
   } catch (error) {

@@ -32,5 +32,17 @@ const requireAuth = async (req, res, next) => {
     return res.status(401).json({ error: 'Request not authorized' });
   }
 };
+const requireSalesManager = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized. Please log in.' });
+  }
 
-module.exports = requireAuth;
+  if (req.user.role !== 'sales_manager') {
+    console.log(`Access denied for role: ${req.user.role}`);
+    return res.status(403).json({ error: 'Access denied: Sales Manager only' });
+  }
+
+  console.log("Access granted for Sales Manager");
+  next();
+};
+module.exports = { requireAuth, requireSalesManager };

@@ -75,7 +75,7 @@ exports.addItem = async (req, res) => {
 
     res.status(200).json(cart);
   } catch (error) {
-    console.error('Error adding item to cart:', error);
+    console.log('Error adding item to cart:', error);
     res.status(500).json({ error: 'Error adding item to cart' });
   }
 };
@@ -135,7 +135,7 @@ exports.updateItem = async (req, res) => {
       res.status(404).json({ error: 'Product not found in the cart' });
     }
   } catch (error) {
-    console.error('Error updating product in the cart:', error);
+    console.log('Error updating product in the cart:', error);
     res.status(500).json({ error: 'Error updating product in the cart' });
   }
 };
@@ -166,7 +166,7 @@ exports.removeItem = async (req, res) => {
       res.status(404).json({ error: 'Product not found in the cart' });
     }
   } catch (error) {
-    console.error('Error removing product from the cart:', error);
+    console.log('Error removing product from the cart:', error);
     res.status(500).json({ error: 'Error removing product from the cart' });
   }
 };
@@ -190,7 +190,30 @@ exports.viewCart = async (req, res) => {
 
     res.status(200).json(cart);
   } catch (error) {
-    console.error('Error viewing cart:', error);
+    console.log('Error viewing cart:', error);
     res.status(500).json({ error: 'Error viewing cart' });
+  }
+};
+// clearCart
+
+exports.clearCart = async (req, res) => {
+  try {
+    console.log('clearCart function called');
+    const userId = req.user?._id || null;
+    const guestId = !userId ? req.guestId : null;
+
+    console.log('User ID:', userId);
+    console.log('Guest ID:', guestId);
+
+    const cart = await findOrCreateCart(userId, guestId);
+
+    cart.items = [];
+    await cart.save();
+
+    console.log('Cart cleared successfully:', cart);
+    res.status(200).json({ message: 'Cart cleared successfully' });
+  } catch (error) {
+    console.log('Error clearing the cart:', error);
+    res.status(500).json({ error: 'Error clearing the cart' });
   }
 };

@@ -1,5 +1,3 @@
-// server.js
-
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
@@ -11,11 +9,11 @@ const cartRoutes = require('./Routes/cartRoutes');
 const orderRoutes = require('./Routes/orderRoutes');
 const paymentRoute = require('./Routes/paymentRoutes');
 const setUser = require('./Middleware/setUser'); 
-const categoryRoutes = require('./Routes/categoryRoutes');
+const wishlistRoutes = require('./Routes/wishlistRoutes');
 
 require('dotenv').config();
-
 const app = express();
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175']; 
 
 app.use(express.json());
 
@@ -36,27 +34,45 @@ app.use(session({
 }));
 
 app.use(cors({
-  origin: 'http://localhost:5173', // Allow requests from the frontend
-  credentials: true, // Allow cookies and authorization headers
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true, 
 }));
 
-// Database connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('Database connected'))
-  .catch((err) => console.log(err));
-
-// Middleware: Set user or guestId
 app.use(setUser);
 
 app.use('/api/users', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/cart', cartRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/payment', paymentRoute);
-app.use('/api/categories', categoryRoutes);
 
-// Start server
+app.use('/api/products', productRoutes);
+
+app.use('/api/cart', cartRoutes);
+
+app.use('/api/orders', orderRoutes);
+
+app.use('/api/payment', paymentRoute);
+
+app.use('/api/wishlist', wishlistRoutes);
+
+
+app.use((req, res, next) => {
+  res.status(404).json({ message: 'Route not found' });
+});
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'An internal server error occurred' });
+});
+
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Database connected'))
+  .catch((err) => console.log(err));
