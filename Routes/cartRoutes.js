@@ -13,7 +13,6 @@ router.delete('/remove', cartController.removeItem);
 router.get('/view', cartController.viewCart);
 router.delete('/clear', cartController.clearCart);
 
-
 // Merge guest cart with authenticated user's cart
 router.post('/merge', requireAuth, async (req, res) => {
   try {

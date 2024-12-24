@@ -1,7 +1,6 @@
 const User = require("../Models/User");
 const Product = require("../Models/Product");
 
-
 exports.addToWishlist = async (req, res) => {
     const userId = req.user.id; 
     const { productId } = req.body;
@@ -25,7 +24,6 @@ exports.addToWishlist = async (req, res) => {
     }
 };
 
-
 exports.removeFromWishlist = async (req, res) => {
     const userId = req.user.id; 
     const { productId } = req.body;
@@ -43,7 +41,6 @@ exports.removeFromWishlist = async (req, res) => {
         res.status(500).json({ error: "Error removing product from wishlist", details: error.message });
     }
 };
-
 
 exports.getWishlist = async (req, res) => {
     const userId = req.user.id;

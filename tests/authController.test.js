@@ -79,7 +79,6 @@ describe('Auth Controller', () => {
     });
   });
 
-
   describe('logout', () => {
     it('should logout the user and clear the cookie', async () => {
       req.cookies.jwt = 'testRefreshToken';

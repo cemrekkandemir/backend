@@ -313,5 +313,3 @@ exports.applyDiscount = async (req, res) => {
         res.status(500).json({ message: "Error applying discount", error: error.message });
     }
 };
-
-

@@ -29,7 +29,6 @@ router.post('/:productId/feedback', productController.postComment);
 
 router.put('/:productId/increase-popularity', productController.increasePopularity);
 
-
 // Route to fetch pending comments
 router.get('/comments/pending', productController.getPendingComments);
 

@@ -1,11 +1,4 @@
 const mongoose = require('mongoose');
-const refundSchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
-  requestedAt: { type: Date, default: Date.now },
-  resolvedAt: { type: Date },
-  managerNote: { type: String },
-});
 const orderSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   products: [
@@ -14,11 +7,10 @@ const orderSchema = new mongoose.Schema({
       quantity: { type: Number, required: true },
     },
   ],
-  refunds: [refundSchema],
   totalAmount: { type: Number, required: true },
   orderStatus: {
     type: String,
-    enum: ['processing', 'in-transit', 'delivered', 'refunded', 'canceled'],
+    enum: ['processing', 'in-transit', 'delivered', 'refunded'],
     default: 'processing',
   },
   address: {

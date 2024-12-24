@@ -10,13 +10,10 @@ router.get('/status', orderController.getLatestOrderStatus);
 router.get('/all', orderController.getAllOrders);
 router.get('/admin/all', orderController.getAllOrdersAdmin);
 router.get('/invoices/date-range', requireAuth, requireSalesManager, orderController.getInvoicesByDateRange);
-router.get('/invoices/pdf/date-range', requireAuth, requireSalesManager, orderController.getInvoicesPDFByDateRange);
 router.get('/revenue', requireAuth, requireSalesManager, orderController.getRevenueAndProfitLoss);
 router.post('/:orderId/refund', requireAuth, orderController.requestRefund);
 router.get('/delivery-list', orderController.getDeliveryList);
-router.get("/refunds", requireAuth, requireSalesManager,  orderController.getAllRefundRequests);
-router.put("/refunds/:refundId/approve", requireAuth, requireSalesManager,  orderController.approveRefundRequest);
-router.put("/refunds/:refundId/reject", requireAuth, requireSalesManager,  orderController.rejectRefundRequest);
-router.post('/:orderId/cancel', requireAuth, orderController.cancelOrder);
-module.exports = router;
+router.post('/invoices/selected', requireAuth, requireSalesManager, orderController.getSelectedInvoices);
+router.post('/invoices/pdf/selected', requireAuth, requireSalesManager, orderController.generateSelectedInvoicesPDF);
 
+module.exports = router;

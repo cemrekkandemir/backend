@@ -3,7 +3,7 @@ const nodemailer = require('nodemailer');
 const Joi = require('joi');
 const crypto = require('crypto');
 const creditCardType = require('credit-card-type');
-const User = require('../Models/User'); // User modelinin doğru şekilde import edildiğinden emin olun
+const User = require('../Models/User'); 
 
 // Mock Payment
 exports.mockPayment = async (req, res) => {

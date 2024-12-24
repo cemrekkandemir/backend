@@ -2,14 +2,11 @@ const Order = require('../Models/Order');
 const Cart = require('../Models/Cart');
 const Product = require('../Models/Product');
 const PDFDocument = require('pdfkit');
-const nodemailer = require('nodemailer');
 
 // Place Order
 exports.placeOrder = async (req, res) => {
   try {
     const { shippingInfo } = req.body;
-
-    // Validate shippingInfo
     if (
       !shippingInfo ||
       !shippingInfo.name ||
@@ -40,7 +37,6 @@ exports.placeOrder = async (req, res) => {
       await item.productId.save();
     }
 
-    // Create a new order
     const order = await Order.create({
       user: req.user._id,
       products: cart.items.map((item) => ({
@@ -73,7 +69,6 @@ exports.updateOrderStatus = async (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
 
-  // Validate status
   if (!["processing", "in-transit", "delivered"].includes(status)) {
     return res.status(400).json({ error: "Invalid status" });
   }
@@ -101,7 +96,7 @@ exports.getLatestOrderStatus = async (req, res) => {
   try {
     const latestOrder = await Order.findOne({ user: req.user._id })
       .sort({ createdAt: -1 })
-      .populate("products.productId", "name price"); // Populate product details
+      .populate("products.productId", "name price");
 
     if (!latestOrder) {
       return res.status(404).json({ error: "No orders found for this user." });
@@ -161,29 +156,12 @@ exports.getAllOrders = async (req, res) => {
           ? "In transit, expected in 2-3 days"
           : "Delivered",
       totalAmount: order.totalAmount,
-      products: order.products.map((product) => {
-        const refund = order.refunds.find(
-          (refund) =>
-            refund.productId?.toString() === product.productId._id.toString()
-        );
-
-        return {
-          productId: product.productId._id,
-          name: product.productId.name || "Unknown Product",
-          quantity: product.quantity,
-          price: product.productId.price || 0,
-          refundStatus: refund ? refund.status : null,
-          refundDetails: refund
-            ? {
-                refundId: refund._id,
-                status: refund.status,
-                requestedAt: refund.requestedAt,
-                resolvedAt: refund.resolvedAt,
-                managerNote: refund.managerNote || null,
-              }
-            : null,
-        };
-      }),
+      products: order.products.map((product) => ({
+        productId: product.productId?._id,
+        name: product.productId?.name || "Unknown Product",
+        quantity: product.quantity,
+        price: product.productId?.price || 0,
+      })),
     }));
 
     res.status(200).json(formattedOrders);
@@ -192,6 +170,7 @@ exports.getAllOrders = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 // Get All Orders (Admin View)
 exports.getAllOrdersAdmin = async (req, res) => {
   try {
@@ -282,7 +261,7 @@ exports.getInvoicesByDateRange = async (req, res) => {
   }
 };
 
-// Get Invoices PDF within a given date range
+// Get the Invoices as PDF 
 exports.getInvoicesPDFByDateRange = async (req, res) => {
   const { startDate, endDate } = req.query;
 
@@ -342,6 +321,99 @@ exports.getInvoicesPDFByDateRange = async (req, res) => {
   }
 };
 
+// Fetch selected invoices by IDs
+exports.getSelectedInvoices = async (req, res) => {
+  const { invoiceIds } = req.body;
+
+  if (!invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+    return res.status(400).json({ error: 'Please provide a valid list of invoice IDs.' });
+  }
+
+  try {
+    const invoices = await Order.find({ _id: { $in: invoiceIds } })
+      .populate('user', 'name email')
+      .populate('products.productId', 'name price');
+
+    if (!invoices || invoices.length === 0) {
+      return res.status(404).json({ error: 'No invoices found for the provided IDs.' });
+    }
+
+    const formattedInvoices = invoices.map((invoice) => ({
+      invoiceId: invoice._id,
+      userName: invoice.user?.name || 'Unknown User',
+      userEmail: invoice.user?.email || 'No Email',
+      totalAmount: invoice.totalAmount,
+      status: invoice.orderStatus,
+      createdAt: invoice.createdAt,
+      products: invoice.products.map((item) => ({
+        name: item.productId?.name || 'Unknown Product',
+        quantity: item.quantity,
+        price: item.productId?.price || 0,
+      })),
+    }));
+
+    res.status(200).json(formattedInvoices);
+  } catch (error) {
+    console.error('Error fetching selected invoices:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// Generate a PDF for selected invoices
+exports.generateSelectedInvoicesPDF = async (req, res) => {
+  const { invoiceIds } = req.body;
+
+  if (!invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+    return res.status(400).json({
+      error: 'Please provide an array of invoice IDs.',
+    });
+  }
+
+  try {
+    const invoices = await Order.find({ _id: { $in: invoiceIds } })
+      .populate('user', 'name email')
+      .populate('products.productId', 'name price');
+
+    if (!invoices || invoices.length === 0) {
+      return res.status(404).json({ error: 'No invoices found for the provided IDs.' });
+    }
+
+    const doc = new PDFDocument();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="selected_invoices.pdf"');
+
+    doc.pipe(res);
+
+    doc.fontSize(20).text('Selected Invoices', { underline: true });
+    doc.moveDown();
+
+    invoices.forEach((invoice, index) => {
+      doc.fontSize(16).text(`Invoice #${index + 1}`, { underline: true });
+      doc.text(`Invoice ID: ${invoice._id}`);
+      doc.text(`User: ${invoice.user?.name || 'Unknown User'} (${invoice.user?.email || 'No Email'})`);
+      doc.text(`Status: ${invoice.orderStatus}`);
+      doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`);
+      doc.text(`Total Amount: $${invoice.totalAmount}`);
+      doc.moveDown().fontSize(14).text('Products:', { underline: true });
+
+      invoice.products.forEach((item) => {
+        const productName = item.productId?.name || 'Unknown Product';
+        const productPrice = item.productId?.price || 0;
+        doc.text(`- ${productName}: ${item.quantity} x $${productPrice}`);
+      });
+
+      doc.moveDown(2);
+    });
+
+    doc.end();
+  } catch (error) {
+    console.error('Error generating selected invoices PDF:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+
+// Get Revenue and Profit/Loss
 exports.getRevenueAndProfitLoss = async (req, res) => {
   try {
     const { start, end } = req.query;
@@ -361,7 +433,6 @@ exports.getRevenueAndProfitLoss = async (req, res) => {
     let totalProfit = 0;
     let totalLoss = 0;
 
- 
     orders.forEach((order) => {
       totalRevenue += order.totalAmount;
       const cost = order.totalAmount * 0.7;
@@ -384,80 +455,6 @@ exports.getRevenueAndProfitLoss = async (req, res) => {
   } catch (error) {
     console.error("Failed to calculate revenue:", error.message);
     return res.status(500).json({ error: "Internal server error" });
-  }
-};
-exports.requestRefund = async (req, res) => {
-  try {
-    const userId = req.user?._id;
-    const { orderId } = req.params;
-    const { productId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: "User ID is missing." });
-    }
-    if (!productId) {
-      return res.status(400).json({ error: "Product ID is required." });
-    }
-
-    const order = await Order.findOne({ _id: orderId, user: userId }).populate({
-      path: "products.productId",
-      select: "name price",
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: "Order not found." });
-    }
-
-    if (order.orderStatus !== "delivered") {
-      return res.status(400).json({ error: "Refunds can only be requested for delivered orders." });
-    }
-
-    const productInOrder = order.products.find(
-      (item) => item.productId && item.productId._id.toString() === productId
-    );
-
-    if (!productInOrder) {
-      return res.status(400).json({ error: "Product not found in order." });
-    }
-
-    const purchaseDate = new Date(order.createdAt);
-    const currentDate = new Date();
-    const daysDifference = Math.ceil((currentDate - purchaseDate) / (1000 * 60 * 60 * 24));
-    if (daysDifference > 30) {
-      return res.status(400).json({ error: "Refund request exceeds 30-day return policy." });
-    }
-
-    const isAlreadyRequested = order.refunds.some(
-      (refund) => refund.productId.toString() === productId && refund.status === "pending"
-    );
-    if (isAlreadyRequested) {
-      return res.status(400).json({ error: "Refund already requested for this product." });
-    }
-
-    // Add refund request
-    const refundRequest = {
-      productId: productId,
-      status: "pending",
-      requestedAt: new Date(),
-    };
-
-    order.refunds.push(refundRequest);
-
-    // Save the order with the new refund
-    await order.save();
-
-    res.status(200).json({
-      message: "Refund request submitted successfully.",
-      refundDetails: {
-        orderId: order._id,
-        productId: productId,
-        productName: productInOrder.productId.name,
-        quantity: productInOrder.quantity,
-      },
-    });
-  } catch (error) {
-    console.error("Refund request error:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -487,235 +484,89 @@ exports.getDeliveryList = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: false, // Use true for 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-exports.approveRefundRequest = async (req, res) => {
-  try {
-    const { refundId } = req.params;
-    const { managerNote } = req.body;
 
-    // Find the order containing the refund request and populate user details
-    const order = await Order.findOne({ "refunds._id": refundId })
-      .populate("refunds.productId", "name price") // Populate refund product details
-      .populate("products.productId", "name price") // Populate order product details
-      .populate("user", "name email"); // Populate user details
+exports.requestRefund = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { orderId } = req.params;
+    const { productId } = req.body;
+
+    // Validate input
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is missing." });
+    }
+    if (!productId) {
+      return res.status(400).json({ error: "Product ID is required." });
+    }
+
+    // Find the order and populate products
+    const order = await Order.findOne({ _id: orderId, user: userId }).populate({
+      path: "products.productId",
+      select: "name price stock",
+    });
 
     if (!order) {
-      return res.status(404).json({ error: "Refund request not found." });
+      return res.status(404).json({ error: "Order not found." });
     }
 
-    // Find the specific refund in the order
-    const refund = order.refunds.id(refundId);
-    if (!refund) {
-      return res.status(404).json({ error: "Refund request not found." });
-    }
-
-    // Check if the refund is already processed
-    if (refund.status !== "pending") {
-      return res.status(400).json({ error: "Refund is already processed." });
-    }
-
-    // Find the corresponding product in the order's products array
+    // Check if the product exists in the order
     const productInOrder = order.products.find(
-      (product) => product.productId._id.toString() === refund.productId._id.toString()
+      (item) => item.productId && item.productId._id.toString() === productId
     );
 
     if (!productInOrder) {
-      return res.status(400).json({ error: "Product not found in the order." });
+      return res.status(400).json({ error: "Product not found in order." });
     }
 
-    const refundQuantity = productInOrder.quantity;
-    const refundAmount = refundQuantity * productInOrder.productId.price; // Use populated price from the order summary
+    // Check if the refund request is within 30 days
+    const purchaseDate = new Date(order.createdAt);
+    const currentDate = new Date();
+    const daysDifference = Math.ceil((currentDate - purchaseDate) / (1000 * 60 * 60 * 24));
+    if (daysDifference > 30) {
+      return res.status(400).json({ error: "Refund request exceeds 30-day return policy." });
+    }
+
+    // Calculate the refund amount
+    const refundAmount = productInOrder.productId.price * productInOrder.quantity;
 
     // Update product stock
-    const product = await Product.findById(refund.productId._id);
+    const product = await Product.findById(productId);
     if (product) {
-      product.stock += refundQuantity;
+      product.stock += productInOrder.quantity;
       await product.save();
+    } else {
+      return res.status(404).json({ error: "Product not found in inventory." });
     }
 
-    // Update refund status
-    refund.status = "approved";
-    refund.resolvedAt = new Date();
-    refund.managerNote = managerNote || "No note provided.";
+    // Update the order: remove the refunded product and adjust the total amount
+    order.products = order.products.filter(
+      (item) => item.productId._id.toString() !== productId
+    );
+    order.totalAmount -= refundAmount;
 
-    // Save the order with updated refund status
+    // If all products are refunded, update order status to "refunded"
+    if (order.products.length === 0) {
+      order.orderStatus = "refunded";
+    }
+
     await order.save();
 
-    // Send email notification to the customer
-    if (order.user && order.user.email) {
-      const mailOptions = {
-        from: `"Vegan Eats Shop" <${process.env.EMAIL_USER}>`,
-        to: order.user.email,
-        subject: "Refund Approved",
-        text: `Dear ${order.user.name},\n\nYour refund request for the product "${productInOrder.productId.name}" has been approved.\n\nRefund Details:\nProduct: ${productInOrder.productId.name}\nQuantity: ${refundQuantity}\nRefund Amount: $${refundAmount.toFixed(2)}\n\nManager's Note: ${managerNote || "No additional details provided."}\n\nThank you for shopping with us.\n\nVegan Eats Team`,
-        html: `
-          <p>Dear <strong>${order.user.name}</strong>,</p>
-          <p>Your refund request for the product <strong>${productInOrder.productId.name}</strong> has been <strong>approved</strong>.</p>
-          <p><strong>Refund Details:</strong></p>
-          <ul>
-            <li><strong>Product:</strong> ${productInOrder.productId.name}</li>
-            <li><strong>Quantity:</strong> ${refundQuantity}</li>
-            <li><strong>Refund Amount:</strong> $${refundAmount.toFixed(2)}</li>
-          </ul>
-          <p><strong>Manager's Note:</strong> ${managerNote || "No additional details provided."}</p>
-          <p>Thank you for shopping with us.</p>
-          <p><strong>Vegan Eats Team</strong></p>
-        `,
-      };
-
-      await transporter.sendMail(mailOptions);
-    }
-
     res.status(200).json({
-      message: "Refund approved successfully.",
-      refundDetails: {
-        refundId: refund._id,
-        productName: productInOrder.productId.name,
-        quantity: refundQuantity,
-        refundAmount,
-        status: refund.status,
-        resolvedAt: refund.resolvedAt,
-        managerNote: refund.managerNote,
+      message: "Refund processed successfully.",
+      refundedAmount: refundAmount,
+      updatedOrder: {
+        orderId: order._id,
+        status: order.orderStatus,
+        totalAmount: order.totalAmount,
+        products: order.products.map((item) => ({
+          name: item.productId.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
       },
     });
   } catch (error) {
-    console.error("Error approving refund request:", error.message);
+    console.error("Refund request error:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-exports.rejectRefundRequest = async (req, res) => {
-  try {
-      const { refundId } = req.params;
-      const { managerNote } = req.body;
-
-     
-      const order = await Order.findOne({ "refunds._id": refundId })
-          .populate("refunds.productId", "name price")
-          .populate("user", "name email"); 
-
-      if (!order) {
-          return res.status(404).json({ error: "Refund request not found." });
-      }
-
-
-      const refund = order.refunds.id(refundId);
-
-      if (!refund) {
-          return res.status(404).json({ error: "Refund request not found." });
-      }
-
-
-      if (refund.status !== "pending") {
-          return res.status(400).json({ error: "Refund is already processed." });
-      }
-
-      
-      refund.status = "rejected";
-      refund.resolvedAt = new Date();
-      refund.managerNote = managerNote || "No note provided.";
-      await order.save();
-
-    
-      if (!order.user || !order.user.email) {
-          console.error("User email not found. Cannot send notification.");
-          return res.status(500).json({ error: "User email not found. Cannot send notification." });
-      }
-
-      const mailOptions = {
-          from: `"Vegan Eats Shop" <${process.env.EMAIL_USER}>`,
-          to: order.user.email,
-          subject: "Refund Request Rejected",
-          text: `Dear ${order.user.name},\n\nYour refund request for the product "${refund.productId.name}" has been rejected.\n\nManager's Note: ${managerNote || "No additional details provided."}\n\nThank you for shopping with us.`,
-          html: `
-              <p>Dear <strong>${order.user.name}</strong>,</p>
-              <p>Your refund request for the product <strong>"${refund.productId.name}"</strong> has been <strong>rejected</strong>.</p>
-              <p><strong>Manager's Note:</strong> ${managerNote || "No additional details provided."}</p>
-              <p>Thank you for shopping with us.</p>
-              <p>Best regards,<br><strong>Vegan Eats Team</strong></p>
-          `,
-      };
-
-      await transporter.sendMail(mailOptions);
-
-      res.status(200).json({
-          message: "Refund request rejected successfully.",
-          refundDetails: {
-              refundId: refund._id,
-              productName: refund.productId.name,
-              status: refund.status,
-              resolvedAt: refund.resolvedAt,
-              managerNote: refund.managerNote,
-          },
-      });
-  } catch (error) {
-      console.error("Error rejecting refund request:", error.message);
-      res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-exports.getAllRefundRequests = async (req, res) => {
-  try {
-    const ordersWithRefunds = await Order.find({ "refunds.0": { $exists: true } })
-      .populate("refunds.productId", "name price")
-      .populate("user", "name email");
-
-    if (!ordersWithRefunds || ordersWithRefunds.length === 0) {
-      return res.status(404).json({ message: "No refund requests found." });
-    }
-
-    const formattedRefundRequests = ordersWithRefunds.flatMap((order) =>
-      order.refunds.map((refund) => ({
-        refundId: refund._id,
-        orderId: order._id,
-        product: refund.productId ? { name: refund.productId.name, price: refund.productId.price } : null,
-        user: { name: order.user.name, email: order.user.email },
-        status: refund.status,
-        requestedAt: refund.requestedAt,
-        resolvedAt: refund.resolvedAt,
-        managerNote: refund.managerNote || null,
-      }))
-    );
-
-    res.status(200).json(formattedRefundRequests);
-  } catch (error) {
-    console.error("Error fetching all refund requests:", error.message);
-    res.status(500).json({ error: "Failed to fetch refund requests." });
-  }
-};
-
-exports.cancelOrder = async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const userId = req.user._id;
-
-    const order = await Order.findOne({ _id: orderId, user: userId, orderStatus: "processing" });
-
-    if (!order) {
-      return res.status(404).json({ error: "Order not found or not cancellable." });
-    }
-
-    for (const product of order.products) {
-      const productDoc = await Product.findById(product.productId);
-      if (productDoc) {
-        productDoc.stock += product.quantity;
-        await productDoc.save();
-      }
-    }
-
-    order.orderStatus = "canceled";
-    await order.save();
-
-    res.status(200).json({ message: "Order canceled successfully." });
-  } catch (error) {
-    console.error("Error canceling order:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-

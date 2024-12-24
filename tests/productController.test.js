@@ -188,6 +188,5 @@ describe('Product Controller', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'Invalid product ID' });
     });
 
-
   });
 });
