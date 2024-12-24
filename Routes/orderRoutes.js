@@ -14,6 +14,9 @@ router.get('/invoices/pdf/date-range', requireAuth, requireSalesManager, orderCo
 router.get('/revenue', requireAuth, requireSalesManager, orderController.getRevenueAndProfitLoss);
 router.post('/:orderId/refund', requireAuth, orderController.requestRefund);
 router.get('/delivery-list', orderController.getDeliveryList);
-
+router.get("/refunds", requireAuth, requireSalesManager,  orderController.getAllRefundRequests);
+router.put("/refunds/:refundId/approve", requireAuth, requireSalesManager,  orderController.approveRefundRequest);
+router.put("/refunds/:refundId/reject", requireAuth, requireSalesManager,  orderController.rejectRefundRequest);
+router.post('/:orderId/cancel', requireAuth, orderController.cancelOrder);
 module.exports = router;
 
