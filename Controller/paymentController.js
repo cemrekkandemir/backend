@@ -8,6 +8,7 @@ const User = require('../Models/User');
 // Mock Payment
 exports.mockPayment = async (req, res) => {
     const paymentSchema = Joi.object({
+        nameOnCard: Joi.string().required(),
         cardNumber: Joi.string().required(),
         expiry: Joi.string().required(),
         cvv: Joi.string().length(3).required(),
@@ -19,7 +20,7 @@ exports.mockPayment = async (req, res) => {
         return res.status(400).json({ message: error.details[0].message });
     }
 
-    const { cardNumber, expiry, cvv, amount } = req.body;
+    const { nameOnCard, cardNumber, expiry, cvv, amount } = req.body;
 
     try {
         // Validate and detect card type
@@ -59,7 +60,7 @@ exports.mockPayment = async (req, res) => {
                 transactionId,
                 orderDetails: {
                     id: `ORDER-${Date.now()}`,
-                    amount,
+                    amount
                 },
             });
         } else {
