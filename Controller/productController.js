@@ -313,3 +313,124 @@ exports.applyDiscount = async (req, res) => {
         res.status(500).json({ message: "Error applying discount", error: error.message });
     }
 };
+exports.getDistinctCategories = async (req, res) => {
+    try {
+      const categories = await Product.distinct("category");
+      res.status(200).json(categories);
+    } catch (error) {
+      console.error("Error fetching distinct categories:", error.message);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+};
+exports.addNewCategory = async (req, res) => {
+    try {
+        const { categoryName } = req.body;
+        if (!categoryName) {
+            return res.status(400).json({ error: "Category name is required" });
+        }
+
+        // Mevcut kategorileri çek
+        const existingCategories = await Product.distinct("category");
+        if (existingCategories.includes(categoryName)) {
+            return res.status(400).json({ error: "This category already exists." });
+        }
+
+        // Yeni bir dummy ürün oluştur
+        const dummyProduct = new Product({
+            name: `Dummy Product for ${categoryName}`,
+            description: "Auto-created to represent a new category",
+            price: 0,
+            category: categoryName,
+            brand: "No Brand",
+            stock: 0,
+            imageURL: "https://via.placeholder.com/150",
+        });
+
+        await dummyProduct.save();
+
+        return res.status(201).json({
+            message: `New category "${categoryName}" added successfully.`,
+            category: categoryName,
+        });
+    } catch (error) {
+        console.error("Error adding new category:", error.message);
+        return res.status(500).json({ error: "Failed to add new category" });
+    }
+};
+
+exports.deleteCategory = async (req, res) => {
+    try {
+      const { category } = req.body;
+      if (!category) {
+        return res.status(400).json({ error: "Category is required." });
+      }
+  
+      console.log("Deleting category:", category);
+
+      // Bu kategorideki tüm ürünlerin kategorisini "Uncategorized" olarak değiştir
+      const result = await Product.updateMany(
+        { category: category },
+        { $set: { category: "Uncategorized" } }
+      );
+  
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ error: "Category not found." });
+      }
+  
+      return res.status(200).json({
+        message: `Category "${category}" removed successfully.`,
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("Error deleting category:", error.message);
+      return res.status(500).json({ error: "Failed to delete category." });
+    }
+};
+  
+exports.updateProductStock = async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const { newStock } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({ error: "Invalid productId" });
+        }
+        if (typeof newStock !== 'number' || newStock < 0) {
+            return res.status(400).json({ error: "Invalid stock value" });
+        }
+
+        const updatedProduct = await Product.findByIdAndUpdate(
+            productId,
+            { stock: newStock },
+            { new: true }
+        );
+
+        if (!updatedProduct) {
+            return res.status(404).json({ error: "Product not found" });
+        }
+
+        res.status(200).json({
+            message: "Stock updated successfully",
+            product: updatedProduct,
+        });
+    } catch (error) {
+        console.error("Error updating product stock:", error.message);
+        res.status(500).json({ error: "Failed to update product stock" });
+    }
+};
+
+// Controller: getCategories
+exports.getCategories = async (req, res) => {
+    try {
+      let categories = await Product.distinct('category');
+      // "Uncategorized" filtered
+      categories = categories.filter((cat) => cat !== 'Uncategorized');
+
+      res.status(200).json(categories);
+    } catch (error) {
+      console.error('Error fetching categories:', error.message);
+      res.status(500).json({ error: 'Failed to fetch categories.' });
+    }
+};
+  
