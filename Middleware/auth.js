@@ -45,4 +45,18 @@ const requireSalesManager = (req, res, next) => {
   console.log("Access granted for Sales Manager");
   next();
 };
-module.exports = { requireAuth, requireSalesManager };
+const requireProductManager = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized. Please log in.' });
+  }
+
+  if (req.user.role !== 'product_manager') {
+    console.log(`Access denied for role: ${req.user.role}`);
+    return res.status(403).json({ error: 'Access denied: Product Manager only' });
+  }
+
+  console.log("Access granted for Product Manager");
+  next();
+};
+
+module.exports = { requireAuth, requireSalesManager, requireProductManager };

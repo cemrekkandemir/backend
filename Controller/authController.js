@@ -81,6 +81,22 @@ exports.login = async (req, res) => {
       });
     }
 
+    if (user.role === 'product_manager') {
+      // Just generate an access token but do not set refresh token cookie
+      const accessToken = generateAccessToken(user);
+      return res.status(200).json({
+        accessToken,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          address: user.address,
+          role: user.role,
+          accessToken: accessToken
+        }
+      });
+    }
+
     // For other users, proceed as normal: set the session, merge carts, set cookies
     req.session.userId = user._id;
     await mergeCarts(user._id, oldSessionID);

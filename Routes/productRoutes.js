@@ -1,18 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../Controller/productController');
-const { requireAuth, requireSalesManager } = require('../Middleware/auth');
+const { requireAuth, requireSalesManager, requireProductManager } = require('../Middleware/auth');
 
-router.get('/categories', productController.getCategories);
+router.get('/categories', requireAuth, requireProductManager, productController.getCategories);
 
-// 2) Yeni kategori ekle
-router.post('/add-category', productController.addNewCategory);
+router.post('/add-category', requireAuth, requireProductManager, productController.addNewCategory);
 
-// 3) Kategori sil
-router.delete('/delete-category', productController.deleteCategory);
+router.delete('/delete-category', requireAuth, requireProductManager, productController.deleteCategory);
 
-// 4) Ürün stok güncelleme
-router.put('/stock/:productId', productController.updateProductStock);
+router.put('/stock/:productId', requireAuth, requireProductManager, productController.updateProductStock);
 
 
 router.get('/', productController.getAllProducts);
