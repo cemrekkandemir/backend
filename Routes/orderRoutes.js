@@ -15,6 +15,7 @@ router.post('/:orderId/refund', requireAuth, orderController.requestRefund);
 router.get('/delivery-list', requireProductManager, orderController.getDeliveryList);
 router.post('/invoices/selected', requireAuth, requireSalesManager, orderController.getSelectedInvoices);
 router.post('/invoices/pdf/selected', requireAuth, requireSalesManager, orderController.generateSelectedInvoicesPDF);
+router.get("/refunds", requireAuth, requireSalesManager,  orderController.getAllRefundRequests);
 router.put("/refunds/:refundId/approve", requireAuth, requireSalesManager,  orderController.approveRefundRequest);
 router.put("/refunds/:refundId/reject", requireAuth, requireSalesManager,  orderController.rejectRefundRequest);
 router.post('/:orderId/cancel', requireAuth, orderController.cancelOrder);

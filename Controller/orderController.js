@@ -158,12 +158,29 @@ exports.getAllOrders = async (req, res) => {
           ? "In transit, expected in 2-3 days"
           : "Delivered",
       totalAmount: order.totalAmount,
-      products: order.products.map((product) => ({
-        productId: product.productId?._id,
-        name: product.productId?.name || "Unknown Product",
-        quantity: product.quantity,
-        price: product.productId?.price || 0,
-      })),
+      products: order.products.map((product) => {
+        const refund = order.refunds.find(
+          (refund) =>
+            refund.productId?.toString() === product.productId._id.toString()
+        );
+
+        return {
+          productId: product.productId._id,
+          name: product.productId.name || "Unknown Product",
+          quantity: product.quantity,
+          price: product.productId.price || 0,
+          refundStatus: refund ? refund.status : null,
+          refundDetails: refund
+            ? {
+                refundId: refund._id,
+                status: refund.status,
+                requestedAt: refund.requestedAt,
+                resolvedAt: refund.resolvedAt,
+                managerNote: refund.managerNote || null,
+              }
+            : null,
+        };
+      }),
     }));
 
     res.status(200).json(formattedOrders);
@@ -172,7 +189,6 @@ exports.getAllOrders = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 // Get All Orders (Admin View)
 exports.getAllOrdersAdmin = async (req, res) => {
   try {
@@ -784,3 +800,4 @@ exports.cancelOrder = async (req, res) => {
   }
 };
 
+ 
