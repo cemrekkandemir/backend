@@ -19,4 +19,5 @@ router.get("/refunds", requireAuth, requireSalesManager,  orderController.getAll
 router.put("/refunds/:refundId/approve", requireAuth, requireSalesManager,  orderController.approveRefundRequest);
 router.put("/refunds/:refundId/reject", requireAuth, requireSalesManager,  orderController.rejectRefundRequest);
 router.post('/:orderId/cancel', requireAuth, orderController.cancelOrder);
+router.get('/invoices/productmanager/date-range', requireAuth, requireProductManager, orderController.getInvoicesByDateRange);
 module.exports = router;
