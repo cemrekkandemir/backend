@@ -190,6 +190,7 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 // Get All Orders (Admin View)
+// getAllOrdersAdmin
 exports.getAllOrdersAdmin = async (req, res) => {
   try {
     const orders = await Order.find({})
@@ -220,6 +221,8 @@ exports.getAllOrdersAdmin = async (req, res) => {
         quantity: product.quantity,
         price: product.productId?.price || 0,
       })),
+
+      address: order.address ?? null,
     }));
 
     res.status(200).json(formattedOrders);
@@ -228,6 +231,7 @@ exports.getAllOrdersAdmin = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 
 // Get invoices within a given date range
 exports.getInvoicesByDateRange = async (req, res) => {

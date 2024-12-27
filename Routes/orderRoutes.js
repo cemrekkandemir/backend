@@ -5,14 +5,14 @@ const orderController = require('../Controller/orderController');
 const { requireAuth, requireSalesManager, requireProductManager } = require('../Middleware/auth');
 
 router.post('/place', requireAuth, orderController.placeOrder);
-router.put('/:orderId/status', orderController.updateOrderStatus);
+router.put('/:orderId/status', requireAuth ,requireProductManager, orderController.updateOrderStatus);
 router.get('/status', orderController.getLatestOrderStatus);
 router.get('/all', orderController.getAllOrders);
-router.get('/admin/all', orderController.getAllOrdersAdmin);
+router.get('/admin/all', requireAuth ,requireProductManager, orderController.getAllOrdersAdmin);
 router.get('/invoices/date-range', requireAuth, requireSalesManager, orderController.getInvoicesByDateRange);
 router.get('/revenue', requireAuth, requireSalesManager, orderController.getRevenueAndProfitLoss);
 router.post('/:orderId/refund', requireAuth, orderController.requestRefund);
-router.get('/delivery-list', requireProductManager, orderController.getDeliveryList);
+router.get('/delivery-list', requireAuth ,requireProductManager, orderController.getDeliveryList);
 router.post('/invoices/selected', requireAuth, requireSalesManager, orderController.getSelectedInvoices);
 router.post('/invoices/pdf/selected', requireAuth, requireSalesManager, orderController.generateSelectedInvoicesPDF);
 router.get("/refunds", requireAuth, requireSalesManager,  orderController.getAllRefundRequests);
