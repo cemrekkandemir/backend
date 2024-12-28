@@ -34,7 +34,7 @@ exports.createProducts = async (req, res) => {
 exports.createProduct = async (req, res) => {
     try {
     
-      const { name, description, price, category, brand, stock, imageURL } = req.body;
+      const { name, description, originalPrice, category, brand, stock, imageURL } = req.body;
       
       const newProduct = new Product({ name, description, price, category, brand, stock, imageURL });
       const savedProduct = await newProduct.save();
@@ -245,21 +245,41 @@ exports.rejectComment = async (req, res) => {
   exports.setPrice = async (req, res) => {
     const { id } = req.params;
     const { price } = req.body;
-
+  
     if (!price || price <= 0) {
-        return res.status(400).json({ message: "Invalid price value." });
+      return res.status(400).json({ message: "Invalid price value." });
     }
-
+  
     try {
-        const product = await Product.findByIdAndUpdate(id, { price }, { new: true });
-        if (!product) {
-            return res.status(404).json({ message: "Product not found." });
-        }
-        res.status(200).json({ message: "Price updated successfully", price: product.price });
+      const product = await Product.findById(id);
+  
+      if (!product) {
+        return res.status(404).json({ message: "Product not found." });
+      }
+  
+      // Update original price only if the new price is different
+      if (product.price !== price) {
+        product.originalPrice = price; // Set original price
+        product.price = price; // Update current price
+        product.discountPercentage = 0; // Reset discount
+        await product.save();
+      }
+  
+      res.status(200).json({
+        message: "Price updated successfully.",
+        updatedProduct: {
+          _id: product._id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          discountPercentage: product.discountPercentage,
+        },
+      });
     } catch (error) {
-        res.status(500).json({ message: "Error updating price", error: error.message });
+      console.error("Error updating price:", error.message);
+      res.status(500).json({ message: "Error updating price", error: error.message });
     }
-};
+  };
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port: process.env.EMAIL_PORT,
@@ -273,50 +293,70 @@ const transporter = nodemailer.createTransport({
 exports.applyDiscount = async (req, res) => {
     const { id } = req.params;
     const { discountPercentage } = req.body;
-
+  
     if (!discountPercentage || discountPercentage <= 0 || discountPercentage > 100) {
-        return res.status(400).json({ message: "Invalid discount percentage." });
+      return res.status(400).json({ message: "Invalid discount percentage." });
     }
-
+  
     try {
-        const product = await Product.findById(id);
-        if (!product) {
-            return res.status(404).json({ message: "Product not found." });
-        }
-
-        const discountedPrice = product.price - (product.price * discountPercentage) / 100;
-        product.price = discountedPrice;
-        await product.save();
-
-        const usersWithProduct = await User.find({ wishlist: id });
-        const emailPromises = usersWithProduct.map((user) => {
-            const mailOptions = {
-                from: `"Vegan Eats Shop" <${process.env.EMAIL_USER}>`,
-                to: user.email,
-                subject: "Great news! A product in your wishlist is on discount 🎉",
-                text: `Dear ${user.name},\n\nThe product "${product.name}" in your wishlist is now available at a discounted price: $${discountedPrice.toFixed(2)}.\n\nHurry up and grab it while the offer lasts!\n\nBest regards,\nVegan Eats Team`,
-                html: `
-                    <p>Dear <strong>${user.name}</strong>,</p>
-                    <p>The product <strong>"${product.name}"</strong> in your wishlist is now available at a discounted price: <strong>$${discountedPrice.toFixed(2)}</strong>.</p>
-                    <p>Hurry up and grab it while the offer lasts!</p>
-                    <p>Best regards,<br><strong>Vegan Eats Team</strong></p>
-                `,
-            };
-
-            return transporter.sendMail(mailOptions);
-        });
-
-        await Promise.all(emailPromises);
-
-        res.status(200).json({
-            message: "Discount applied successfully. Notification emails sent.",
-            price: product.price,
-        });
+      const product = await Product.findById(id);
+  
+      if (!product) {
+        return res.status(404).json({ message: "Product not found." });
+      }
+  
+      // Set the original price if not already set
+      if (!product.originalPrice) {
+        product.originalPrice = product.price;
+      }
+  
+      // Calculate the discounted price
+      const discountedPrice = product.originalPrice - (product.originalPrice * discountPercentage) / 100;
+  
+      product.price = discountedPrice;
+      product.discountPercentage = discountPercentage; // Update discount percentage
+      await product.save();
+  
+      // Notify users with this product in their wishlist
+      const usersWithProduct = await User.find({ wishlist: id });
+      const emailPromises = usersWithProduct.map((user) => {
+        const mailOptions = {
+          from: `"Vegan Eats Shop" <${process.env.EMAIL_USER}>`,
+          to: user.email,
+          subject: "Great news! A product in your wishlist is on discount 🎉",
+          text: `Dear ${user.name},\n\nThe product "${product.name}" in your wishlist is now available at a discounted price: ₺${discountedPrice.toFixed(
+            2
+          )}.\n\nHurry up and grab it while the offer lasts!\n\nBest regards,\nVegan Eats Team`,
+          html: `
+            <p>Dear <strong>${user.name}</strong>,</p>
+            <p>The product <strong>"${product.name}"</strong> in your wishlist is now available at a discounted price: <strong>₺${discountedPrice.toFixed(
+              2
+            )}</strong>.</p>
+            <p>Hurry up and grab it while the offer lasts!</p>
+            <p>Best regards,<br><strong>Vegan Eats Team</strong></p>
+          `,
+        };
+  
+        return transporter.sendMail(mailOptions);
+      });
+  
+      await Promise.all(emailPromises);
+  
+      res.status(200).json({
+        message: "Discount applied successfully. Notification emails sent.",
+        updatedProduct: {
+          _id: product._id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          discountPercentage: product.discountPercentage,
+        },
+      });
     } catch (error) {
-        console.error("Error applying discount:", error.message);
-        res.status(500).json({ message: "Error applying discount", error: error.message });
+      console.error("Error applying discount:", error.message);
+      res.status(500).json({ message: "Error applying discount", error: error.message });
     }
-};
+  };
 exports.getDistinctCategories = async (req, res) => {
     try {
       const categories = await Product.distinct("category");

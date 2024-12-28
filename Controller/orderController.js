@@ -9,6 +9,8 @@ const nodemailer = require('nodemailer');
 exports.placeOrder = async (req, res) => {
   try {
     const { shippingInfo } = req.body;
+
+    // Validate shipping info
     if (
       !shippingInfo ||
       !shippingInfo.name ||
@@ -26,25 +28,41 @@ exports.placeOrder = async (req, res) => {
       return res.status(400).json({ error: "Cart is empty" });
     }
 
-    // Calculate total amount and validate cart items
+    // Initialize total amount and prepare products for order
     let totalAmount = 0;
-    for (const item of cart.items) {
-      if (!item.productId || item.quantity <= 0 || item.productId.stock < item.quantity) {
-        return res.status(400).json({ error: `Invalid item: ${item.productId?.name || "Unknown product"}` });
-      }
-      totalAmount += item.productId.price * item.quantity;
+    const productsForOrder = [];
 
-      // Reduce stock for ordered items
-      item.productId.stock -= item.quantity;
-      await item.productId.save();
+    for (const item of cart.items) {
+      const product = item.productId;
+
+      // Validate product details
+      if (!product || item.quantity <= 0 || product.stock < item.quantity) {
+        return res.status(400).json({ error: `Invalid item: ${product?.name || "Unknown product"}` });
+      }
+
+      // Determine price at the time of purchase
+      const priceAtPurchase = product.price; // Ensure we always use the current price, whether discounted or not
+
+      // Add to total amount
+      totalAmount += priceAtPurchase * item.quantity;
+
+      // Deduct stock
+      product.stock -= item.quantity;
+      await product.save();
+
+      // Add product details to the order
+      productsForOrder.push({
+        productId: product._id,
+        quantity: item.quantity,
+        priceAtPurchase, // Store the price at purchase
+        isDiscounted: product.discountPercentage > 0,
+      });
     }
 
+    // Create the order with product and user details
     const order = await Order.create({
       user: req.user._id,
-      products: cart.items.map((item) => ({
-        productId: item.productId._id,
-        quantity: item.quantity,
-      })),
+      products: productsForOrder,
       totalAmount,
       address: {
         name: shippingInfo.name,
@@ -59,13 +77,13 @@ exports.placeOrder = async (req, res) => {
     cart.items = [];
     await cart.save();
 
+    // Respond to the user
     res.status(201).json({ message: "Order placed successfully", orderId: order._id });
   } catch (error) {
     console.error("Order placement error:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 // Update Order Status
 exports.updateOrderStatus = async (req, res) => {
   const { orderId } = req.params;
@@ -119,7 +137,8 @@ exports.getLatestOrderStatus = async (req, res) => {
       products: latestOrder.products.map((item) => ({
         name: item.productId.name,
         quantity: item.quantity,
-        price: item.productId.price,
+        priceAtPurchase: item.priceAtPurchase,
+        isDiscounted: item.isDiscounted,
       })),
     });
   } catch (error) {
@@ -136,17 +155,19 @@ exports.getAllOrders = async (req, res) => {
       return res.status(400).json({ error: "User ID is missing." });
     }
 
+    // Fetch orders for the user, sorted by creation date
     const orders = await Order.find({ user: userId })
       .sort({ createdAt: -1 })
       .populate({
         path: "products.productId",
-        select: "name price",
+        select: "name price originalPrice discountPercentage",
       });
 
     if (!orders || orders.length === 0) {
       return res.status(404).json({ error: "No orders found for this user." });
     }
 
+    // Format the orders
     const formattedOrders = orders.map((order) => ({
       orderId: order._id,
       status: order.orderStatus,
@@ -156,9 +177,12 @@ exports.getAllOrders = async (req, res) => {
           ? "Within 5-7 business days"
           : order.orderStatus === "in-transit"
           ? "In transit, expected in 2-3 days"
+          : order.orderStatus === "refunded"
+          ? "Refunded"
           : "Delivered",
       totalAmount: order.totalAmount,
       products: order.products.map((product) => {
+        // Find any refund associated with this product
         const refund = order.refunds.find(
           (refund) =>
             refund.productId?.toString() === product.productId._id.toString()
@@ -168,7 +192,8 @@ exports.getAllOrders = async (req, res) => {
           productId: product.productId._id,
           name: product.productId.name || "Unknown Product",
           quantity: product.quantity,
-          price: product.productId.price || 0,
+          priceAtPurchase: product.priceAtPurchase || product.productId.price, // Use priceAtPurchase
+          isDiscounted: product.isDiscounted,
           refundStatus: refund ? refund.status : null,
           refundDetails: refund
             ? {
@@ -256,7 +281,7 @@ exports.getInvoicesByDateRange = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .populate('user', 'name email')
-      .populate('products.productId', 'name price');
+      .populate('products.productId', 'name priceAtPurchase');
 
     if (!orders || orders.length === 0) {
       return res.status(404).json({ error: 'No invoices found in the given date range.' });
@@ -272,7 +297,8 @@ exports.getInvoicesByDateRange = async (req, res) => {
       products: order.products.map((item) => ({
         name: item.productId?.name || 'Unknown Product',
         quantity: item.quantity,
-        price: item.productId?.price || 0,
+        priceAtPurchase: item.priceAtPurchase || 0, // Use price at the time of purchase
+        isDiscounted: item.isDiscounted, // Show if the product was discounted
       })),
     }));
 
@@ -303,7 +329,7 @@ exports.getInvoicesPDFByDateRange = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .populate('user', 'name email')
-      .populate('products.productId', 'name price');
+      .populate('products.productId', 'name ');
 
     if (!orders || orders.length === 0) {
       return res.status(404).json({ error: 'No invoices found in the given date range.' });
@@ -329,8 +355,9 @@ exports.getInvoicesPDFByDateRange = async (req, res) => {
 
       order.products.forEach((item) => {
         const productName = item.productId?.name || 'Unknown Product';
-        const productPrice = item.productId?.price || 0;
-        doc.text(`- ${productName}: ${item.quantity} x $${productPrice}`);
+        const priceAtPurchase = item.priceAtPurchase || 0;
+       
+        doc.text(`- ${productName}: ${item.quantity} x  $${priceAtPurchase}`);
       });
 
       doc.moveDown(2);
@@ -368,9 +395,12 @@ exports.getSelectedInvoices = async (req, res) => {
       status: invoice.orderStatus,
       createdAt: invoice.createdAt,
       products: invoice.products.map((item) => ({
-        name: item.productId?.name || 'Unknown Product',
+        name: item.productId?.name || "Unknown Product",
         quantity: item.quantity,
-        price: item.productId?.price || 0,
+        priceAtPurchase: item.priceAtPurchase || 0, // Use price at the time of purchase
+        isDiscounted: item.isDiscounted, // Show if the product was discounted
+        originalPrice: item.productId?.originalPrice || item.priceAtPurchase, // Include original price
+        discountPercentage: item.productId?.discountPercentage || 0, // Include discount percentage
       })),
     }));
 
@@ -419,10 +449,11 @@ exports.generateSelectedInvoicesPDF = async (req, res) => {
       doc.moveDown().fontSize(14).text('Products:', { underline: true });
 
       invoice.products.forEach((item) => {
-        const productName = item.productId?.name || 'Unknown Product';
-        const productPrice = item.productId?.price || 0;
-        doc.text(`- ${productName}: ${item.quantity} x $${productPrice}`);
+        const productName = item.productId?.name || "Unknown Product";
+        const priceAtPurchase = item.priceAtPurchase || 0;
+        doc.text(`- ${productName}: ${item.quantity} x $${priceAtPurchase.toFixed(2)}`);
       });
+  
 
       doc.moveDown(2);
     });
@@ -581,16 +612,25 @@ exports.requestRefund = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  secure: false, 
+  auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+  },
+});
 exports.approveRefundRequest = async (req, res) => {
   try {
     const { refundId } = req.params;
     const { managerNote } = req.body;
 
-    // Find the order containing the refund request and populate user details
+    // Find the order containing the refund request and populate details
     const order = await Order.findOne({ "refunds._id": refundId })
-      .populate("refunds.productId", "name price") // Populate refund product details
-      .populate("products.productId", "name price") // Populate order product details
-      .populate("user", "name email"); // Populate user details
+      .populate("refunds.productId", "name")
+      .populate("products.productId", "name priceAtPurchase")
+      .populate("user", "name email");
 
     if (!order) {
       return res.status(404).json({ error: "Refund request not found." });
@@ -607,7 +647,7 @@ exports.approveRefundRequest = async (req, res) => {
       return res.status(400).json({ error: "Refund is already processed." });
     }
 
-    // Find the corresponding product in the order's products array
+    // Find the corresponding product in the order
     const productInOrder = order.products.find(
       (product) => product.productId._id.toString() === refund.productId._id.toString()
     );
@@ -617,30 +657,33 @@ exports.approveRefundRequest = async (req, res) => {
     }
 
     const refundQuantity = productInOrder.quantity;
-    const refundAmount = refundQuantity * productInOrder.productId.price; // Use populated price from the order summary
+    const refundAmount = refundQuantity * productInOrder.priceAtPurchase; 
 
-    // Update product stock
+
     const product = await Product.findById(refund.productId._id);
     if (product) {
-      product.stock += refundQuantity;
+      product.stock += refundQuantity; 
       await product.save();
     }
 
-    // Update refund status
     refund.status = "approved";
     refund.resolvedAt = new Date();
-    refund.managerNote = managerNote || "No note provided.";
+    refund.managerNote = managerNote || "No additional details provided.";
+    order.totalAmount -= refundAmount;
 
-    // Save the order with updated refund status
+    
     await order.save();
 
-    // Send email notification to the customer
     if (order.user && order.user.email) {
       const mailOptions = {
         from: `"Vegan Eats Shop" <${process.env.EMAIL_USER}>`,
         to: order.user.email,
         subject: "Refund Approved",
-        text: `Dear ${order.user.name},\n\nYour refund request for the product "${productInOrder.productId.name}" has been approved.\n\nRefund Details:\nProduct: ${productInOrder.productId.name}\nQuantity: ${refundQuantity}\nRefund Amount: $${refundAmount.toFixed(2)}\n\nManager's Note: ${managerNote || "No additional details provided."}\n\nThank you for shopping with us.\n\nVegan Eats Team`,
+        text: `Dear ${order.user.name},\n\nYour refund request for the product "${productInOrder.productId.name}" has been approved.\n\nRefund Details:\nProduct: ${productInOrder.productId.name}\nQuantity: ${refundQuantity}\nRefund Amount: ₺${refundAmount.toFixed(
+          2
+        )}\n\nManager's Note: ${
+          managerNote || "No additional details provided."
+        }\n\nThank you for shopping with us.\n\nVegan Eats Team`,
         html: `
           <p>Dear <strong>${order.user.name}</strong>,</p>
           <p>Your refund request for the product <strong>${productInOrder.productId.name}</strong> has been <strong>approved</strong>.</p>
@@ -648,9 +691,11 @@ exports.approveRefundRequest = async (req, res) => {
           <ul>
             <li><strong>Product:</strong> ${productInOrder.productId.name}</li>
             <li><strong>Quantity:</strong> ${refundQuantity}</li>
-            <li><strong>Refund Amount:</strong> $${refundAmount.toFixed(2)}</li>
+            <li><strong>Refund Amount:</strong> ₺${refundAmount.toFixed(2)}</li>
           </ul>
-          <p><strong>Manager's Note:</strong> ${managerNote || "No additional details provided."}</p>
+          <p><strong>Manager's Note:</strong> ${
+            managerNote || "No additional details provided."
+          }</p>
           <p>Thank you for shopping with us.</p>
           <p><strong>Vegan Eats Team</strong></p>
         `,
@@ -666,6 +711,7 @@ exports.approveRefundRequest = async (req, res) => {
         productName: productInOrder.productId.name,
         quantity: refundQuantity,
         refundAmount,
+        updatedTotalAmount: order.totalAmount,
         status: refund.status,
         resolvedAt: refund.resolvedAt,
         managerNote: refund.managerNote,
@@ -748,7 +794,8 @@ exports.rejectRefundRequest = async (req, res) => {
 exports.getAllRefundRequests = async (req, res) => {
   try {
     const ordersWithRefunds = await Order.find({ "refunds.0": { $exists: true } })
-      .populate("refunds.productId", "name price")
+      .populate("refunds.productId", "name")
+      .populate("products.productId", "name priceAtPurchase") 
       .populate("user", "name email");
 
     if (!ordersWithRefunds || ordersWithRefunds.length === 0) {
@@ -756,16 +803,30 @@ exports.getAllRefundRequests = async (req, res) => {
     }
 
     const formattedRefundRequests = ordersWithRefunds.flatMap((order) =>
-      order.refunds.map((refund) => ({
-        refundId: refund._id,
-        orderId: order._id,
-        product: refund.productId ? { name: refund.productId.name, price: refund.productId.price } : null,
-        user: { name: order.user.name, email: order.user.email },
-        status: refund.status,
-        requestedAt: refund.requestedAt,
-        resolvedAt: refund.resolvedAt,
-        managerNote: refund.managerNote || null,
-      }))
+      order.refunds.map((refund) => {
+        const productInOrder = order.products.find(
+          (product) => product.productId?._id.toString() === refund.productId?._id.toString()
+        );
+
+        return {
+          refundId: refund._id,
+          orderId: order._id,
+          product: refund.productId
+            ? {
+                name: refund.productId.name,
+                priceAtPurchase: productInOrder?.priceAtPurchase || 0, 
+              }
+            : null,
+          user: {
+            name: order.user?.name || "Unknown User",
+            email: order.user?.email || "No Email",
+          },
+          status: refund.status,
+          requestedAt: refund.requestedAt,
+          resolvedAt: refund.resolvedAt,
+          managerNote: refund.managerNote || null,
+        };
+      })
     );
 
     res.status(200).json(formattedRefundRequests);

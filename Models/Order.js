@@ -12,6 +12,8 @@ const orderSchema = new mongoose.Schema({
     {
       productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
       quantity: { type: Number, required: true },
+      priceAtPurchase: { type: Number, required: true }, // The price at the time of purchase
+      isDiscounted: { type: Boolean, default: false },
     },
   ],
   refunds: [refundSchema],
