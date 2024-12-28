@@ -32,13 +32,17 @@ exports.createProducts = async (req, res) => {
 
 // Create a new product (POST)
 exports.createProduct = async (req, res) => {
-    const { name, description, price, category, brand, stock, imageURL } = req.body;
-    const newProduct = new Product({ name, description, price, category, brand, stock, imageURL });
     try {
-        const savedProduct = await newProduct.save();
-        res.status(201).json(savedProduct);
+    
+      const { name, description, price, category, brand, stock, imageURL } = req.body;
+      
+      const newProduct = new Product({ name, description, price, category, brand, stock, imageURL });
+      const savedProduct = await newProduct.save();
+  
+      return res.status(201).json(savedProduct);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+      console.error('Error creating product:', error.message);
+      return res.status(500).json({ message: error.message });
     }
 };
 
@@ -329,13 +333,11 @@ exports.addNewCategory = async (req, res) => {
             return res.status(400).json({ error: "Category name is required" });
         }
 
-        // Mevcut kategorileri çek
         const existingCategories = await Product.distinct("category");
         if (existingCategories.includes(categoryName)) {
             return res.status(400).json({ error: "This category already exists." });
         }
 
-        // Yeni bir dummy ürün oluştur
         const dummyProduct = new Product({
             name: `Dummy Product for ${categoryName}`,
             description: "Auto-created to represent a new category",
@@ -367,7 +369,6 @@ exports.deleteCategory = async (req, res) => {
   
       console.log("Deleting category:", category);
 
-      // Bu kategorideki tüm ürünlerin kategorisini "Uncategorized" olarak değiştir
       const result = await Product.updateMany(
         { category: category },
         { $set: { category: "Uncategorized" } }

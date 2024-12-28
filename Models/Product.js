@@ -17,11 +17,11 @@ const ratingSchema = new mongoose.Schema({
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String, required: true },
-  price: { type: Number, required: true },
+  price: { type: Number, required: true , min:0 },
   category: { type: String, default: "Uncategorized" },
   brand: { type: String, required: true },
   stock: { type: Number, required: true },
-  imageURL: { type: String, required: true },
+  imageURL: { type: String, required: false },
   comments: [commentSchema],
   ratings: [ratingSchema],
   averageRating: { type: Number, default: 0 },
