@@ -148,6 +148,7 @@ exports.getLatestOrderStatus = async (req, res) => {
 };
 
 // Get All Orders for the authenticated user
+// Get All Orders for the authenticated user
 exports.getAllOrders = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -188,6 +189,12 @@ exports.getAllOrders = async (req, res) => {
             refund.productId?.toString() === product.productId._id.toString()
         );
 
+        // Determine if the product is returnable (30 days after delivery date)
+        const isReturnable =
+          order.orderStatus === "delivered" &&
+          new Date() <=
+            new Date(new Date(order.statusUpdatedAt).getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from delivery
+
         return {
           productId: product.productId._id,
           name: product.productId.name || "Unknown Product",
@@ -195,6 +202,7 @@ exports.getAllOrders = async (req, res) => {
           priceAtPurchase: product.priceAtPurchase || product.productId.price, // Use priceAtPurchase
           isDiscounted: product.isDiscounted,
           refundStatus: refund ? refund.status : null,
+          isReturnable, // Add isReturnable field
           refundDetails: refund
             ? {
                 refundId: refund._id,
@@ -214,6 +222,7 @@ exports.getAllOrders = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 // Get All Orders (Admin View)
 // getAllOrdersAdmin
 exports.getAllOrdersAdmin = async (req, res) => {
