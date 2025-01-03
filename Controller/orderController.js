@@ -523,18 +523,30 @@ exports.getRevenueAndProfitLoss = async (req, res) => {
 exports.getDeliveryList = async (req, res) => {
   try {
     const orders = await Order.find({ orderStatus: { $in: ['in-transit', 'delivered', 'refunded'] } })
-      .select("user products totalAmount address orderStatus createdAt")
+      .select("user products totalAmount address orderStatus refunds createdAt")
       .populate("user", "_id name email") 
       .populate("products.productId", "name price"); 
+    
     const deliveryList = orders.map((order) => ({
       deliveryId: order._id,
       customerId: order.user?._id || "Unknown ID", 
       customerName: order.user?.name || "Unknown Customer",
-      products: order.products.map((product) => ({
-        productId: product.productId?._id || "Unknown ID",
-        productName: product.productId?.name || "Unknown Product",
-        quantity: product.quantity || 0,
-      })),
+      products: order.products.map((product) => {
+        // Refund edilen ürünü bul
+        const refundItem = order.refunds.find(refund => 
+          refund.productId.equals(product.productId?._id)
+        );
+
+        // Refund statüsünü kontrol et
+        const refundStatus = refundItem ? refundItem.status : "No";
+        
+        return {
+          productId: product.productId?._id || "Unknown ID",
+          productName: product.productId?.name || "Unknown Product",
+          quantity: product.quantity || 0,
+          refundStatus: refundStatus,  
+        };
+      }),
       totalPrice: order.totalAmount,
       deliveryAddress: `${order.address.name}, ${order.address.address}, ${order.address.city}, ${order.address.postalCode}, ${order.address.country}`,
       status: order.orderStatus, 
@@ -546,6 +558,8 @@ exports.getDeliveryList = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
 
 exports.requestRefund = async (req, res) => {
   try {
