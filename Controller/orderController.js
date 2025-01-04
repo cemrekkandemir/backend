@@ -89,7 +89,7 @@ exports.updateOrderStatus = async (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
 
-  if (!["processing", "in-transit", "delivered"].includes(status)) {
+  if (!['processing', 'in-transit', 'delivered', 'refunded', 'canceled'].includes(status)) {
     return res.status(400).json({ error: "Invalid status" });
   }
 
@@ -127,6 +127,8 @@ exports.getLatestOrderStatus = async (req, res) => {
         ? "Within 5-7 business days"
         : latestOrder.orderStatus === "in-transit"
         ? "In transit, expected in 2-3 days"
+        : latestOrder.orderStatus === "refunded"
+        ? "Refunded"
         : "Delivered";
 
     res.status(200).json({
@@ -248,6 +250,8 @@ exports.getAllOrdersAdmin = async (req, res) => {
           ? "Within 5-7 business days"
           : order.orderStatus === "in-transit"
           ? "In transit, expected in 2-3 days"
+          : order.orderStatus === "refunded"
+          ? "Refunded"
           : "Delivered",
       totalAmount: order.totalAmount,
       products: order.products.map((product) => ({
