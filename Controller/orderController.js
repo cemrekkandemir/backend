@@ -694,6 +694,21 @@ exports.approveRefundRequest = async (req, res) => {
     refund.managerNote = managerNote || "No additional details provided.";
     order.totalAmount -= refundAmount;
 
+
+      // Check if all products in the order have approved refunds
+        const allProductsRefunded = order.products.every(product => {
+          const refundForProduct = order.refunds.find(
+            r => r.productId.toString() === product.productId._id.toString()
+          );
+          return refundForProduct && refundForProduct.status === 'approved';
+        });
+    
+        // Update order status if all products are refunded
+        if (allProductsRefunded) {
+          order.orderStatus = 'refunded';
+          order.statusUpdatedAt = new Date();
+        }
+
     
     await order.save();
 
