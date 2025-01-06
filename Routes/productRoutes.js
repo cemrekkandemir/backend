@@ -3,7 +3,7 @@ const router = express.Router();
 const productController = require('../Controller/productController');
 const { requireAuth, requireSalesManager, requireProductManager } = require('../Middleware/auth');
 
-router.get('/categories', requireAuth, requireProductManager, productController.getCategories);
+router.get('/categories', productController.getCategories);
 
 router.post('/add-category', requireAuth, requireProductManager, productController.addNewCategory);
 
