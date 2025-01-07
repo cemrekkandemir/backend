@@ -23,7 +23,8 @@
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^8.8.3",
         "nodemailer": "^6.9.16",
-        "pdfkit": "^0.15.1"
+        "pdfkit": "^0.15.2",
+        "pdfkit-table": "^0.1.99"
     },
     "devDependencies": {
         "jest": "^29.7.0",
@@ -31,6 +32,6 @@
         "supertest": "^7.0.0"
     },
     "jest": {
-  "testEnvironment": "node"
+        "testEnvironment": "node"
     }
 }

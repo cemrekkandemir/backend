@@ -322,7 +322,6 @@ exports.getInvoicesByDateRange = async (req, res) => {
   }
 };
 
-// Get the Invoices as PDF 
 exports.getInvoicesPDFByDateRange = async (req, res) => {
   const { startDate, endDate } = req.query;
 
@@ -342,36 +341,77 @@ exports.getInvoicesPDFByDateRange = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .populate('user', 'name email')
-      .populate('products.productId', 'name ');
+      .populate('products.productId', 'name priceAtPurchase');
 
     if (!orders || orders.length === 0) {
       return res.status(404).json({ error: 'No invoices found in the given date range.' });
     }
 
-    const doc = new PDFDocument();
+    // Use default font (no custom font registration)
+    const doc = new PDFDocument({ margin: 50 });
+
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="invoices_${startDate}_to_${endDate}.pdf"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="invoices_${startDate}_to_${endDate}.pdf"`
+    );
 
     doc.pipe(res);
 
-    doc.fontSize(20).text(`Invoices from ${startDate} to ${endDate}`, { underline: true });
-    doc.moveDown();
+    // Main heading
+    doc
+      .fontSize(20)
+      .text(`Invoices from ${startDate} to ${endDate}`, {
+        underline: true,
+        align: 'center',
+      })
+      .moveDown(1);
 
+    // Draw a horizontal line across the page
+    doc
+      .moveTo(doc.x, doc.y)
+      .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+      .stroke();
+
+    doc.moveDown(2);
+
+    // Loop through the orders and produce stylized output
     orders.forEach((order, index) => {
-      doc.fontSize(16).text(`Invoice #${index + 1}`, { underline: true });
+      // Subheading for each invoice
+      doc
+        .fontSize(16)
+        .text(`Invoice #${index + 1}`, { underline: true });
+
+      // Display basic order info
+      doc.fontSize(12);
       doc.text(`Invoice ID: ${order._id}`);
-      doc.text(`User: ${order.user?.name || 'Unknown User'} (${order.user?.email || 'No Email'})`);
+      doc.text(`User: ${order.user?.name || 'Unknown User'} <${order.user?.email || 'No Email'}>`);
       doc.text(`Status: ${order.orderStatus}`);
       doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`);
       doc.text(`Total Amount: $${order.totalAmount}`);
-      doc.moveDown().fontSize(14).text('Products:', { underline: true });
 
+      doc.moveDown(1);
+
+      // Section heading for products
+      doc.fontSize(13).text('Products:', { underline: true });
+      doc.fontSize(12);
+
+      // Indent each product line
       order.products.forEach((item) => {
         const productName = item.productId?.name || 'Unknown Product';
         const priceAtPurchase = item.priceAtPurchase || 0;
-       
-        doc.text(`- ${productName}: ${item.quantity} x  $${priceAtPurchase}`);
+        doc.text(`- ${productName} : ${item.quantity} x $${priceAtPurchase}`, { indent: 20 });
       });
+
+      doc.moveDown(1);
+
+      // Draw a dashed line for separation
+      doc
+        .moveTo(doc.x, doc.y)
+        .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+        .dash(2, { space: 2 })
+        .stroke()
+        .undash();
 
       doc.moveDown(2);
     });
@@ -382,6 +422,7 @@ exports.getInvoicesPDFByDateRange = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 // Fetch selected invoices by IDs
 exports.getSelectedInvoices = async (req, res) => {
@@ -424,7 +465,6 @@ exports.getSelectedInvoices = async (req, res) => {
   }
 };
 
-// Generate a PDF for selected invoices
 exports.generateSelectedInvoicesPDF = async (req, res) => {
   const { invoiceIds } = req.body;
 
@@ -437,46 +477,178 @@ exports.generateSelectedInvoicesPDF = async (req, res) => {
   try {
     const invoices = await Order.find({ _id: { $in: invoiceIds } })
       .populate('user', 'name email')
-      .populate('products.productId', 'name price');
+      .populate('products.productId', 'name priceAtPurchase');
 
     if (!invoices || invoices.length === 0) {
       return res.status(404).json({ error: 'No invoices found for the provided IDs.' });
     }
 
-    const doc = new PDFDocument();
+    // Create the PDF doc with some margin
+    const doc = new PDFDocument({ margin: 50 });
+
+    // Set headers for download
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="selected_invoices.pdf"');
 
     doc.pipe(res);
 
-    doc.fontSize(20).text('Selected Invoices', { underline: true });
-    doc.moveDown();
+    // Big Title (optional) on the *first* page
+    doc
+      .fontSize(20)
+      .text('Vegan Eats - Invoices', { underline: true, align: 'center' })
+      .moveDown(1);
 
-    invoices.forEach((invoice, index) => {
-      doc.fontSize(16).text(`Invoice #${index + 1}`, { underline: true });
-      doc.text(`Invoice ID: ${invoice._id}`);
-      doc.text(`User: ${invoice.user?.name || 'Unknown User'} (${invoice.user?.email || 'No Email'})`);
-      doc.text(`Status: ${invoice.orderStatus}`);
-      doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`);
-      doc.text(`Total Amount: $${invoice.totalAmount}`);
-      doc.moveDown().fontSize(14).text('Products:', { underline: true });
+    // Horizontal line (just once at the top)
+    doc
+      .lineWidth(2)
+      .moveTo(doc.x, doc.y)
+      .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+      .stroke();
 
+    doc.moveDown(2);
+
+    // For centering the table/boxes
+    const tableWidth = 500;
+    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const startX = doc.x + (pageWidth - tableWidth) / 2;
+
+    // Add this small left padding:
+    const leftPadding = 15;
+
+    invoices.forEach((invoice, idx) => {
+      // ——————————— PAGE PER INVOICE ———————————
+      if (idx > 0) {
+        doc.addPage();
+      }
+
+      // 1) Capture the topY
+      const invoiceTopY = doc.y;
+
+      // === [ Heading Box ] ===
+      doc
+        .rect(startX, doc.y, tableWidth, 40)
+        .fill('#F0F0F0'); // light-gray background
+
+      const boxY = doc.y;
+
+      // Make sure text is offset inside the box:
+      doc
+        .fillColor('#000')
+        .fontSize(14)
+        .text(`Invoice #${idx + 1}`, startX + leftPadding, boxY + 10);
+
+      doc
+        .fontSize(10)
+        .fillColor('#333')
+        .text(`Invoice ID: ${invoice._id}`, startX + tableWidth - 140, boxY + 10, {
+          width: 130,
+          align: 'right',
+        });
+
+      // Thin line under heading text
+      doc
+        .moveTo(startX, boxY + 35)
+        .lineTo(startX + tableWidth, boxY + 35)
+        .lineWidth(0.5)
+        .strokeColor('#AAA')
+        .stroke();
+
+      // Move below box
+      doc.y = boxY + 45;
+      doc.moveDown(1);
+
+      // Basic info
+      const userName = invoice.user?.name || 'Unknown User';
+      const userEmail = invoice.user?.email || 'No Email';
+      const invoiceDate = new Date(invoice.createdAt).toLocaleDateString();
+      const total = invoice.totalAmount?.toFixed(2) || '0.00';
+
+      // Use `startX + leftPadding` everywhere we place text in this rectangle
+      doc.fontSize(12).fillColor('#000');
+      doc.text(`User: ${userName}  <${userEmail}>`, startX + leftPadding, doc.y, { width: tableWidth });
+      doc.text(`Date: ${invoiceDate}`, startX + leftPadding, doc.y + 15, { width: tableWidth });
+      doc.text(`Status: ${invoice.orderStatus}`, startX + leftPadding, doc.y + 30, { width: tableWidth });
+      doc.text(`Total Amount: $${total}`, startX + leftPadding, doc.y + 45, { width: tableWidth });
+      doc.moveDown(4);
+
+      // Separator line
+      doc
+        .moveTo(startX, doc.y)
+        .lineTo(startX + tableWidth, doc.y)
+        .lineWidth(1)
+        .strokeColor('#DDD')
+        .stroke();
+
+      doc.moveDown(1);
+
+      // Products heading
+      doc.fontSize(13).text('Products', startX + leftPadding, doc.y, { width: tableWidth });
+      doc.moveDown(0.5);
+
+      // Adjust columns to include leftPadding
+      doc.fontSize(10);
+      const col1 = startX + leftPadding;
+      const col2 = col1 + 220;
+      const col3 = col2 + 80;
+      const col4 = col3 + 60;
+
+      const headingY = doc.y;
+      doc.text('Product Name', col1, headingY, { width: 200 });
+      doc.text('Quantity', col2, headingY, { width: 40, align: 'center' });
+      doc.text('Price', col3, headingY, { width: 60, align: 'center' });
+      doc.text('Subtotal', col4, headingY, { width: 60, align: 'center' });
+
+      doc
+        .moveTo(col1, headingY + 12)
+        .lineTo(startX + tableWidth, headingY + 12)
+        .strokeColor('#BBB')
+        .stroke();
+
+      // Each product line
       invoice.products.forEach((item) => {
-        const productName = item.productId?.name || "Unknown Product";
-        const priceAtPurchase = item.priceAtPurchase || 0;
-        doc.text(`- ${productName}: ${item.quantity} x $${priceAtPurchase.toFixed(2)}`);
+        doc.moveDown(0.3);
+        const rowY = doc.y;
+        const productName = item.productId?.name || 'Unknown Product';
+        const quantity = item.quantity || 0;
+        const price = item.priceAtPurchase || 0;
+        const subtotal = (price * quantity).toFixed(2);
+
+        doc.text(productName, col1, rowY, { width: 200 });
+        doc.text(quantity, col2, rowY, { width: 40, align: 'center' });
+        doc.text(`$${price.toFixed(2)}`, col3, rowY, { width: 60, align: 'center' });
+        doc.text(`$${subtotal}`, col4, rowY, { width: 60, align: 'center' });
       });
-  
 
       doc.moveDown(2);
+
+      // Dashed line to separate or finalize invoice content
+      doc
+        .moveTo(startX, doc.y)
+        .lineTo(startX + tableWidth, doc.y)
+        .dash(3, { space: 3 })
+        .strokeColor('#999')
+        .stroke()
+        .undash();
+
+      doc.moveDown(2);
+
+      // 2) Bounding rectangle from invoiceTopY to doc.y
+      const invoiceHeight = doc.y - invoiceTopY;
+      doc
+        .lineWidth(1)
+        .strokeColor('#AAA')
+        .rect(startX, invoiceTopY, tableWidth, invoiceHeight)
+        .stroke();
     });
 
     doc.end();
   } catch (error) {
-    console.error('Error generating selected invoices PDF:', error.message);
+    console.error('Error generating styled invoices (separate pages + bounding box):', error.message);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+
 
 
 // Get Revenue and Profit/Loss
