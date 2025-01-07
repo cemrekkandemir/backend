@@ -30,32 +30,81 @@ exports.createProducts = async (req, res) => {
     }
 };
 
-// Create a new product (POST)
 exports.createProduct = async (req, res) => {
-    try {
+  try {
+    const {
+      name,
+      description,
+      price,
+      category,
+      brand,
+      stock,
+      imageURL,
+    } = req.body;
+
+    const existingCategories = await Product.distinct("category");
     
-      const { name, description, originalPrice, category, brand, stock, imageURL } = req.body;
-      
-      const newProduct = new Product({ name, description, price, category, brand, stock, imageURL });
-      const savedProduct = await newProduct.save();
-  
-      return res.status(201).json(savedProduct);
-    } catch (error) {
-      console.error('Error creating product:', error.message);
-      return res.status(500).json({ message: error.message });
+    if (
+      category &&
+      category !== "Uncategorized" &&
+      !existingCategories.includes(category)
+    ) {
+      return res.status(400).json({
+        error: `Category "${category}" does not exist. Please create it first or choose an existing category.`,
+      });
     }
+    
+    const newProduct = new Product({
+      name,
+      description,
+      price,
+      category: category || "Uncategorized",
+      brand: brand || "No brand",
+      stock: stock || 0,
+      imageURL: imageURL || "",
+    });
+
+    const savedProduct = await newProduct.save();
+    return res.status(201).json(savedProduct);
+
+  } catch (error) {
+    console.error('Error creating product:', error.message);
+    return res.status(500).json({ message: error.message });
+  }
 };
 
-// Update a product by ID (PUT)
 exports.updateProduct = async (req, res) => {
-    try {
-        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedProduct) return res.status(404).json({ error: 'Product not found' });
-        res.status(200).json(updatedProduct);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+  try {
+    // If the update payload has a category, we need to validate it
+    const { category } = req.body;
+    if (category) {
+      const existingCategories = await Product.distinct("category");
+      if (
+        category !== "Uncategorized" &&
+        !existingCategories.includes(category)
+      ) {
+        return res.status(400).json({
+          error: `Category "${category}" does not exist. Please create it first or choose an existing category.`,
+        });
+      }
     }
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      req.body, 
+      { new: true }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.status(200).json(updatedProduct);
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
+
 
 // Delete a product (DELETE)
 exports.deleteProduct = async (req, res) => {
