@@ -2,6 +2,7 @@ const User = require("../Models/User");
 const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
 const Product = require('../Models/Product');
+const Category = require('../Models/Category'); 
 
 // Get a product's details by ID (GET)
 exports.getProductById = async (req, res) => {
@@ -42,17 +43,19 @@ exports.createProduct = async (req, res) => {
       imageURL,
     } = req.body;
 
-    const existingCategories = await Product.distinct("category");
-    
+
+    const existingCategory = await Category.findOne({ name: category });
+
     if (
       category &&
       category !== "Uncategorized" &&
-      !existingCategories.includes(category)
+      !existingCategory
     ) {
       return res.status(400).json({
         error: `Category "${category}" does not exist. Please create it first or choose an existing category.`,
       });
     }
+
     
     const newProduct = new Product({
       name,
@@ -406,6 +409,7 @@ exports.applyDiscount = async (req, res) => {
       res.status(500).json({ message: "Error applying discount", error: error.message });
     }
   };
+
 exports.getDistinctCategories = async (req, res) => {
     try {
       const categories = await Product.distinct("category");
@@ -415,69 +419,57 @@ exports.getDistinctCategories = async (req, res) => {
       res.status(500).json({ error: "Failed to fetch categories" });
     }
 };
+
 exports.addNewCategory = async (req, res) => {
-    try {
-        const { categoryName } = req.body;
-        if (!categoryName) {
-            return res.status(400).json({ error: "Category name is required" });
-        }
-
-        const existingCategories = await Product.distinct("category");
-        if (existingCategories.includes(categoryName)) {
-            return res.status(400).json({ error: "This category already exists." });
-        }
-
-        const dummyProduct = new Product({
-            name: `Dummy Product for ${categoryName}`,
-            description: "Auto-created to represent a new category",
-            price: 0,
-            category: categoryName,
-            brand: "No Brand",
-            stock: 0,
-            imageURL: "https://via.placeholder.com/150",
-        });
-
-        await dummyProduct.save();
-
-        return res.status(201).json({
-            message: `New category "${categoryName}" added successfully.`,
-            category: categoryName,
-        });
-    } catch (error) {
-        console.error("Error adding new category:", error.message);
-        return res.status(500).json({ error: "Failed to add new category" });
+  try {
+    const { categoryName } = req.body;
+    if (!categoryName) {
+      return res.status(400).json({ error: "Category name is required" });
     }
+
+    const existingCategory = await Category.findOne({ name: categoryName });
+    if (existingCategory) {
+      return res.status(400).json({ error: "This category already exists." });
+    }
+
+    const newCategory = new Category({ name: categoryName });
+    await newCategory.save();
+
+    return res.status(201).json({
+      message: `New category "${categoryName}" added successfully.`,
+      category: categoryName,
+    });
+  } catch (error) {
+    console.error("Error adding new category:", error.message);
+    return res.status(500).json({ error: "Failed to add new category" });
+  }
 };
 
 exports.deleteCategory = async (req, res) => {
-    try {
-      const { category } = req.body;
-      if (!category) {
-        return res.status(400).json({ error: "Category is required." });
-      }
-  
-      console.log("Deleting category:", category);
-
-      const result = await Product.updateMany(
-        { category: category },
-        { $set: { category: "Uncategorized" } }
-      );
-  
-      if (result.matchedCount === 0) {
-        return res.status(404).json({ error: "Category not found." });
-      }
-  
-      return res.status(200).json({
-        message: `Category "${category}" removed successfully.`,
-        matchedCount: result.matchedCount,
-        modifiedCount: result.modifiedCount,
-      });
-    } catch (error) {
-      console.error("Error deleting category:", error.message);
-      return res.status(500).json({ error: "Failed to delete category." });
+  try {
+    const { category } = req.body;
+    if (!category) {
+      return res.status(400).json({ error: "Category is required." });
     }
+
+    console.log("Deleting category:", category);
+
+    const deletedCategory = await Category.findOneAndDelete({ name: category });
+    if (!deletedCategory) {
+      return res.status(404).json({ error: "Category not found." });
+    }
+    await Product.deleteMany({ category: category });
+
+    return res.status(200).json({
+      message: `Category "${category}" and all its products are removed successfully.`,
+    });
+  } catch (error) {
+    console.error("Error deleting category:", error.message);
+    return res.status(500).json({ error: "Failed to delete category." });
+  }
 };
-  
+
+
 exports.updateProductStock = async (req, res) => {
     try {
         const { productId } = req.params;
@@ -510,17 +502,16 @@ exports.updateProductStock = async (req, res) => {
     }
 };
 
-// Controller: getCategories
 exports.getCategories = async (req, res) => {
-    try {
-      let categories = await Product.distinct('category');
-      // "Uncategorized" filtered
-      categories = categories.filter((cat) => cat !== 'Uncategorized');
+  try {
+    const categories = await Category.find().select('name -_id');
+    const categoryNames = categories.map(cat => cat.name);
 
-      res.status(200).json(categories);
-    } catch (error) {
-      console.error('Error fetching categories:', error.message);
-      res.status(500).json({ error: 'Failed to fetch categories.' });
-    }
+    res.status(200).json(categoryNames);
+  } catch (error) {
+    console.error('Error fetching categories:', error.message);
+    res.status(500).json({ error: 'Failed to fetch categories.' });
+  }
 };
+
   
