@@ -23,7 +23,7 @@ const productSchema = new mongoose.Schema({
   category: { type: String, default: "Uncategorized" },
   brand: { type: String, required: true },
   stock: { type: Number, required: true },
-  imageURL: { type: String, required: false },
+  imageURL: { type: String, required: true},
   comments: [commentSchema],
   ratings: [ratingSchema],
   averageRating: { type: Number, default: 0 },
