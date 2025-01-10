@@ -26,3 +26,39 @@ jest.mock('pdfkit', () => {
     on: jest.fn()
   }));
 });
+
+
+
+describe('Order Controller Tests', () => {
+    let mockReq;
+    let mockRes;
+  
+    beforeAll(async () => {
+      mongoServer = await MongoMemoryServer.create();
+      await mongoose.connect(mongoServer.getUri());
+    });
+  
+    afterAll(async () => {
+      await mongoose.disconnect();
+      await mongoServer.stop();
+    });
+  
+    beforeEach(() => {
+      mockRes = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      mockReq = {
+        user: { _id: new mongoose.Types.ObjectId() },
+        body: {},
+        params: {},
+        query: {}
+      };
+    });
+  
+    afterEach(async () => {
+      await Order.deleteMany({});
+      await Cart.deleteMany({});
+      await Product.deleteMany({});
+      jest.clearAllMocks();
+    });
