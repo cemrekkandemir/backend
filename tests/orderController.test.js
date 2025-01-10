@@ -150,3 +150,32 @@ describe('Order Controller Tests', () => {
           });
         });
       });
+      describe('getLatestOrderStatus', () => {
+        test('should return latest order status', async () => {
+          const order = await Order.create({
+            user: mockReq.user._id,
+            products: [],
+            totalAmount: 100,
+            orderStatus: 'processing'
+          });
+    
+          await orderController.getLatestOrderStatus(mockReq, mockRes);
+    
+          expect(mockRes.status).toHaveBeenCalledWith(200);
+          expect(mockRes.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+              orderId: order._id,
+              status: 'processing'
+            })
+          );
+        });
+    
+        test('should return 404 when no orders exist', async () => {
+          await orderController.getLatestOrderStatus(mockReq, mockRes);
+    
+          expect(mockRes.status).toHaveBeenCalledWith(404);
+          expect(mockRes.json).toHaveBeenCalledWith({
+            error: 'No orders found for this user.'
+          });
+        });
+      });
