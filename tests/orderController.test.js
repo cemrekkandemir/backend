@@ -206,4 +206,42 @@ describe('Order Controller Tests', () => {
           );
         });
       });
+      describe('cancelOrder', () => {
+        test('should successfully cancel order', async () => {
+          const order = await Order.create({
+            user: mockReq.user._id,
+            products: [],
+            totalAmount: 100,
+            orderStatus: 'processing'
+          });
+    
+          mockReq.params.orderId = order._id;
+    
+          await orderController.cancelOrder(mockReq, mockRes);
+    
+          expect(mockRes.status).toHaveBeenCalledWith(200);
+          expect(mockRes.json).toHaveBeenCalledWith({
+            message: 'Order canceled successfully.'
+          });
+        });
+    
+        test('should return error for non-cancellable order', async () => {
+          const order = await Order.create({
+            user: mockReq.user._id,
+            products: [],
+            totalAmount: 100,
+            orderStatus: 'delivered'
+          });
+    
+          mockReq.params.orderId = order._id;
+    
+          await orderController.cancelOrder(mockReq, mockRes);
+    
+          expect(mockRes.status).toHaveBeenCalledWith(404);
+          expect(mockRes.json).toHaveBeenCalledWith({
+            error: 'Order not found or not cancellable.'
+          });
+        });
+      });
+    });
     
