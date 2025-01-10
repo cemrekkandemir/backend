@@ -179,3 +179,31 @@ describe('Order Controller Tests', () => {
           });
         });
       });
+      describe('requestRefund', () => {
+        test('should successfully create refund request', async () => {
+          const order = await Order.create({
+            user: mockReq.user._id,
+            products: [{
+              productId: new mongoose.Types.ObjectId(),
+              quantity: 1,
+              priceAtPurchase: 100
+            }],
+            totalAmount: 100,
+            orderStatus: 'delivered',
+            createdAt: new Date()
+          });
+    
+          mockReq.params.orderId = order._id;
+          mockReq.body.productId = order.products[0].productId;
+    
+          await orderController.requestRefund(mockReq, mockRes);
+    
+          expect(mockRes.status).toHaveBeenCalledWith(200);
+          expect(mockRes.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+              message: 'Refund request submitted successfully'
+            })
+          );
+        });
+      });
+    
