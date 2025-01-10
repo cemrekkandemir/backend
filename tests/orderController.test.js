@@ -62,3 +62,56 @@ describe('Order Controller Tests', () => {
       await Product.deleteMany({});
       jest.clearAllMocks();
     });
+
+    describe('placeOrder', () => {
+        test('should successfully place an order with valid input', async () => {
+          // Setup test data
+          const product = await Product.create({
+            name: 'Test Product',
+            price: 100,
+            stock: 10
+          });
+    
+          await Cart.create({
+            userId: mockReq.user._id,
+            items: [{
+              productId: product._id,
+              quantity: 2
+            }]
+          });
+    
+          mockReq.body.shippingInfo = {
+            name: 'Test User',
+            address: '123 Test St',
+            city: 'Test City',
+            postalCode: '12345',
+            country: 'Test Country'
+          };
+    
+          // Execute test
+          await orderController.placeOrder(mockReq, mockRes);
+    
+          // Assertions
+          expect(mockRes.status).toHaveBeenCalledWith(201);
+          expect(mockRes.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+              message: 'Order placed successfully',
+              orderId: expect.any(mongoose.Types.ObjectId)
+            })
+          );
+        });
+    
+        test('should return error for incomplete shipping info', async () => {
+          mockReq.body.shippingInfo = {
+            name: 'Test User'
+            // Missing required fields
+          };
+    
+          await orderController.placeOrder(mockReq, mockRes);
+    
+          expect(mockRes.status).toHaveBeenCalledWith(400);
+          expect(mockRes.json).toHaveBeenCalledWith({
+            error: 'Incomplete shipping information.'
+          });
+        });
+      });
