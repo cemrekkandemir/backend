@@ -115,3 +115,38 @@ describe('Order Controller Tests', () => {
           });
         });
       });
+
+      describe('updateOrderStatus', () => {
+        test('should successfully update order status', async () => {
+          const order = await Order.create({
+            user: mockReq.user._id,
+            products: [],
+            totalAmount: 100,
+            orderStatus: 'processing'
+          });
+    
+          mockReq.params.orderId = order._id;
+          mockReq.body.status = 'delivered';
+    
+          await orderController.updateOrderStatus(mockReq, mockRes);
+    
+          expect(mockRes.status).toHaveBeenCalledWith(200);
+          expect(mockRes.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+              message: 'Order status updated successfully'
+            })
+          );
+        });
+    
+        test('should return error for invalid status', async () => {
+          mockReq.params.orderId = new mongoose.Types.ObjectId();
+          mockReq.body.status = 'invalid-status';
+    
+          await orderController.updateOrderStatus(mockReq, mockRes);
+    
+          expect(mockRes.status).toHaveBeenCalledWith(400);
+          expect(mockRes.json).toHaveBeenCalledWith({
+            error: 'Invalid status'
+          });
+        });
+      });
