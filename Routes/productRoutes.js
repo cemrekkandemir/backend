@@ -49,6 +49,6 @@ router.put('/:id/price', requireAuth, requireSalesManager, productController.set
 
 router.put('/:id/discount', requireAuth, requireSalesManager, productController.applyDiscount);
 
-router.get('/distinct-categories', productController.getDistinctCategories);
+router.get('/distinct-categories', requireAuth, requireProductManager, productController.getDistinctCategories);
 
 module.exports = router;
