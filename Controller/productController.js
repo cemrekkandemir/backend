@@ -41,22 +41,19 @@ exports.createProduct = async (req, res) => {
       brand,
       stock,
       imageURL,
+      serialNumber,  
+      distributor,
+      expirationDate,
     } = req.body;
-
 
     const existingCategory = await Category.findOne({ name: category });
 
-    if (
-      category &&
-      category !== "Uncategorized" &&
-      !existingCategory
-    ) {
+    if (category && category !== "Uncategorized" && !existingCategory) {
       return res.status(400).json({
         error: `Category "${category}" does not exist. Please create it first or choose an existing category.`,
       });
     }
 
-    
     const newProduct = new Product({
       name,
       description,
@@ -65,13 +62,15 @@ exports.createProduct = async (req, res) => {
       brand: brand || "No brand",
       stock: stock || 0,
       imageURL: imageURL || "",
+      serialNumber: serialNumber || null, 
+      distributor: distributor || null,
+      expirationDate: expirationDate || null,
     });
 
     const savedProduct = await newProduct.save();
     return res.status(201).json(savedProduct);
-
   } catch (error) {
-    console.error('Error creating product:', error.message);
+    console.error("Error creating product:", error.message);
     return res.status(500).json({ message: error.message });
   }
 };
