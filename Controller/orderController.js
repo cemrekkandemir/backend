@@ -1010,7 +1010,7 @@ exports.approveRefundRequest = async (req, res) => {
           <ul>
             <li><strong>Product:</strong> ${productInOrder.productId.name}</li>
             <li><strong>Quantity:</strong> ${refundQuantity}</li>
-            <li><strong>Refund Amount:</strong> ₺${refundAmount.toFixed(2)}</li>
+            <li><strong>Refund Amount:</strong> $${refundAmount.toFixed(2)}</li>
           </ul>
           <p><strong>Manager's Note:</strong> ${
             managerNote || "No additional details provided."
