@@ -216,3 +216,13 @@ exports.logout = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.getUserTaxId = async (req, res) => {
+  try {
+
+    return res.status(200).json({ taxId: req.user.taxid });
+
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

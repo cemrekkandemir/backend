@@ -1,9 +1,23 @@
 const mongoose = require('mongoose');
 
+
+// Helper function to generate random tax ID
+function generateTaxId() {
+  // Generate a 10-digit random number
+  const randomNum = Math.floor(Math.random() * 9000000000) + 1000000000;
+  return `T${randomNum}`;
+}
+
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
+    trim: true,
+  },
+  taxid: {
+    type: String,
+    default: generateTaxId,
+    unique: true,
     trim: true,
   },
   email: {
