@@ -803,7 +803,8 @@ exports.getProductDistribution = async (req, res) => {
 
 exports.getDeliveryList = async (req, res) => {
   try {
-    const orders = await Order.find({ orderStatus: { $in: ['in-transit', 'delivered', 'refunded'] } })
+
+    const orders = await Order.find({ orderStatus: { $in: ['processing', 'in-transit', 'delivered', 'refunded'] } })
       .select("user products totalAmount address orderStatus refunds createdAt")
       .populate("user", "_id name email") 
       .populate("products.productId", "name price"); 
@@ -813,12 +814,10 @@ exports.getDeliveryList = async (req, res) => {
       customerId: order.user?._id || "Unknown ID", 
       customerName: order.user?.name || "Unknown Customer",
       products: order.products.map((product) => {
-        // Refund edilen ürünü bul
+
         const refundItem = order.refunds.find(refund => 
           refund.productId.equals(product.productId?._id)
         );
-
-        // Refund statüsünü kontrol et
         const refundStatus = refundItem ? refundItem.status : "No";
         
         return {
@@ -839,6 +838,7 @@ exports.getDeliveryList = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 
 
 
