@@ -649,8 +649,6 @@ exports.generateSelectedInvoicesPDF = async (req, res) => {
 };
 
 
-
-
 // Get Revenue and Profit/Loss
 exports.getRevenueAndProfitLoss = async (req, res) => {
   try {
@@ -665,36 +663,143 @@ exports.getRevenueAndProfitLoss = async (req, res) => {
 
     const orders = await Order.find({
       createdAt: { $gte: startDate, $lte: endDate },
-    });
+    })
+      .populate("refunds.productId", "name")
+      .populate("products.productId", "name priceAtPurchase originalPrice")
+      .populate("user", "name email");
 
     let totalRevenue = 0;
+    let totalCost = 0;
     let totalProfit = 0;
     let totalLoss = 0;
+    const productDistribution = {};
+
+    console.log(`Calculating revenue and cost for orders from ${start} to ${end}`);
 
     orders.forEach((order) => {
-      totalRevenue += order.totalAmount;
-      const cost = order.totalAmount * 0.7;
-      const profit = order.totalAmount - cost;
-      if (profit > 0) {
-        totalProfit += profit;
-      } else {
-        totalLoss += Math.abs(profit);
+      let orderRevenue = 0;
+      let orderCost = 0;
+
+      console.log(`Processing Order ID: ${order._id}, Status: ${order.orderStatus}`);
+
+      if (order.orderStatus === "refunded") {
+        console.log(`Order ID: ${order._id} is fully refunded. Only delivery cost is retained.`);
+        const deliveryCost = 30;
+        orderCost += deliveryCost; 
+        orderRevenue += deliveryCost; 
+        totalRevenue += orderRevenue;
+        totalCost += orderCost;
+        return; 
       }
+
+      
+      if (order.orderStatus === "canceled") {
+        console.log(`Order ID: ${order._id} is canceled. Skipping.`);
+        return;
+      }
+
+      order.products.forEach((product) => {
+        if (!product.productId) {
+          console.warn("Product data is missing for a product in order:", order._id);
+          return; 
+        }
+
+        const { originalPrice, priceAtPurchase, name } = product.productId;
+        const effectivePrice = priceAtPurchase || originalPrice || 0;
+
+        const revenue = effectivePrice * product.quantity;
+        const cost = (originalPrice ? originalPrice * 0.5 : effectivePrice * 0.5) * product.quantity;
+
+        const isRefunded = order.refunds?.some(
+          (refund) => refund.productId.toString() === product.productId._id.toString() && refund.status === "approved"
+        );
+
+        if (isRefunded) {
+          console.log(`  Product: ${name || "Unknown"} is refunded. Adjusting totals.`);
+          orderRevenue -= revenue;
+          orderCost -= cost;
+        } else {
+          orderRevenue += revenue;
+          orderCost += cost;
+        }
+
+        const productName = name || "Unknown Product";
+        productDistribution[productName] = (productDistribution[productName] || 0) + product.quantity;
+
+        console.log(`  Product: ${name || "Unknown"} - Quantity: ${product.quantity}`);
+        console.log(`    Original Price: ${originalPrice || "N/A"}`);
+        console.log(`    Price at Purchase: ${priceAtPurchase || "N/A"}`);
+        console.log(`    Calculated Revenue: ${revenue}`);
+        console.log(`    Calculated Cost: ${cost}`);
+      });
+
+      const deliveryCost = 30;
+      orderCost += deliveryCost;
+      orderRevenue += deliveryCost;
+      console.log(`Order ID: ${order._id} - Revenue: ${orderRevenue}, Cost: ${orderCost}`);
+
+      totalRevenue += orderRevenue;
+      totalCost += orderCost;
     });
+    const netProfitLoss = totalRevenue - totalCost;
+    if (netProfitLoss > 0) {
+      totalProfit = netProfitLoss;
+    } else {
+      totalLoss = Math.abs(netProfitLoss);
+    }
+
+    console.log(`Overall Totals: Revenue: ${totalRevenue}, Cost: ${totalCost}, Profit: ${totalProfit}, Loss: ${totalLoss}`);
 
     const responseData = {
       labels: ["Revenue", "Profit", "Loss"],
       revenue: [totalRevenue],
       profit: [totalProfit],
       loss: [totalLoss],
+      productDistribution,
     };
 
     return res.status(200).json(responseData);
   } catch (error) {
-    console.error("Failed to calculate revenue:", error.message);
-    return res.status(500).json({ error: "Internal server error" });
+    console.error("Error calculating revenue and profit/loss:", error.message);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+exports.getProductDistribution = async (req, res) => {
+  try {
+    const { category } = req.query;
+
+    if (!category) {
+      return res.status(400).json({ error: "Category is required" });
+    }
+
+    // Fetch all orders with products belonging to the specified category
+    const orders = await Order.find()
+      .populate({
+        path: "products.productId",
+        select: "name category",
+      })
+      .lean();
+
+    const distribution = {};
+
+    orders.forEach((order) => {
+      order.products.forEach((product) => {
+        const productData = product.productId;
+
+        if (productData && productData.category === category) {
+          const productName = productData.name || "Unknown Product";
+          distribution[productName] = (distribution[productName] || 0) + product.quantity;
+        }
+      });
+    });
+
+    return res.status(200).json(distribution);
+  } catch (error) {
+    console.error("Error fetching product distribution:", error.message);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 
 exports.getDeliveryList = async (req, res) => {
   try {
