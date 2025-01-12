@@ -375,12 +375,12 @@ exports.applyDiscount = async (req, res) => {
           from: `"Vegan Eats Shop" <${process.env.EMAIL_USER}>`,
           to: user.email,
           subject: "Great news! A product in your wishlist is on discount 🎉",
-          text: `Dear ${user.name},\n\nThe product "${product.name}" in your wishlist is now available at a discounted price: ₺${discountedPrice.toFixed(
+          text: `Dear ${user.name},\n\nThe product "${product.name}" in your wishlist is now available at a discounted price: $${discountedPrice.toFixed(
             2
           )}.\n\nHurry up and grab it while the offer lasts!\n\nBest regards,\nVegan Eats Team`,
           html: `
             <p>Dear <strong>${user.name}</strong>,</p>
-            <p>The product <strong>"${product.name}"</strong> in your wishlist is now available at a discounted price: <strong>₺${discountedPrice.toFixed(
+            <p>The product <strong>"${product.name}"</strong> in your wishlist is now available at a discounted price: <strong>$${discountedPrice.toFixed(
               2
             )}</strong>.</p>
             <p>Hurry up and grab it while the offer lasts!</p>

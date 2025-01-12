@@ -893,7 +893,7 @@ exports.approveRefundRequest = async (req, res) => {
         from: `"Vegan Eats Shop" <${process.env.EMAIL_USER}>`,
         to: order.user.email,
         subject: "Refund Approved",
-        text: `Dear ${order.user.name},\n\nYour refund request for the product "${productInOrder.productId.name}" has been approved.\n\nRefund Details:\nProduct: ${productInOrder.productId.name}\nQuantity: ${refundQuantity}\nRefund Amount: ₺${refundAmount.toFixed(
+        text: `Dear ${order.user.name},\n\nYour refund request for the product "${productInOrder.productId.name}" has been approved.\n\nRefund Details:\nProduct: ${productInOrder.productId.name}\nQuantity: ${refundQuantity}\nRefund Amount: $${refundAmount.toFixed(
           2
         )}\n\nManager's Note: ${
           managerNote || "No additional details provided."
