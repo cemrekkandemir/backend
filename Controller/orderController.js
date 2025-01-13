@@ -150,7 +150,6 @@ exports.getLatestOrderStatus = async (req, res) => {
 };
 
 // Get All Orders for the authenticated user
-// Get All Orders for the authenticated user
 exports.getAllOrders = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -170,7 +169,7 @@ exports.getAllOrders = async (req, res) => {
       return res.status(404).json({ error: "No orders found for this user." });
     }
 
-    // Format the orders
+    // Format the orders to include the properly structured address
     const formattedOrders = orders.map((order) => ({
       orderId: order._id,
       status: order.orderStatus,
@@ -184,9 +183,16 @@ exports.getAllOrders = async (req, res) => {
           ? "Refunded"
           : "Delivered",
       totalAmount: order.totalAmount,
+      address: {
+        name: order.address?.name || "N/A",
+        street: order.address?.address || "N/A", // Map the `address` field correctly
+        city: order.address?.city || "N/A",
+        postalCode: order.address?.postalCode || "N/A",
+        country: order.address?.country || "N/A",
+      },
       products: order.products.map((product) => {
         // Find any refund associated with this product
-        const refund = order.refunds.find(
+        const refund = order.refunds?.find(
           (refund) =>
             refund.productId?.toString() === product.productId._id.toString()
         );
@@ -224,7 +230,6 @@ exports.getAllOrders = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 // Get All Orders (Admin View)
 // getAllOrdersAdmin
 exports.getAllOrdersAdmin = async (req, res) => {
